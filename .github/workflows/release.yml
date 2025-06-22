@@ -99,7 +99,12 @@ jobs:
    - name: Update package.json version
      run: |
       VERSION=${GITHUB_REF_NAME#v}
-      npm version $VERSION --no-git-tag-version
+      CURRENT_VERSION=$(node -p "require('./package.json').version")
+      if [ "$VERSION" != "$CURRENT_VERSION" ]; then
+        npm version $VERSION --no-git-tag-version
+      else
+        echo "package.json already at version $VERSION"
+      fi
 
    - name: Publish to npm
      run: npm publish
