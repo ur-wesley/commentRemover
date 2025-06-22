@@ -1,0 +1,87 @@
+run:
+ timeout: 5m
+ tests: true
+ modules-download-mode: readonly
+
+linters:
+ enable:
+  - errcheck
+  - gosimple
+  - govet
+  - ineffassign
+  - staticcheck
+  - typecheck
+  - unused
+  - gofmt
+  - goimports
+  - goconst
+  - gocyclo
+  - misspell
+  - unparam
+  - nakedret
+  - prealloc
+  - exportloopref
+  - nolintlint
+  - revive
+  - gosec
+  - unconvert
+  - gocritic
+  - gocognit
+
+linters-settings:
+ gocyclo:
+  min-complexity: 15
+
+ gocognit:
+  min-complexity: 20
+
+ goconst:
+  min-len: 3
+  min-occurrences: 3
+
+ misspell:
+  locale: US
+
+ nakedret:
+  max-func-lines: 30
+
+ prealloc:
+  simple: true
+  range-loops: true
+  for-loops: false
+
+ revive:
+  rules:
+   - name: exported
+     disabled: false
+   - name: package-comments
+     disabled: true
+   - name: var-naming
+     disabled: false
+
+ gosec:
+  excludes:
+   - G204 # Subprocess launched with variable - we need this for CLI
+
+ gocritic:
+  enabled-tags:
+   - diagnostic
+   - experimental
+   - opinionated
+   - performance
+   - style
+  disabled-checks:
+   - commentedOutCode
+
+issues:
+ exclude-rules:
+  - path: _test\.go
+    linters:
+     - gosec
+     - dupl
+  - path: benchmark_test\.go
+    linters:
+     - dupl
+
+ max-issues-per-linter: 0
+ max-same-issues: 0

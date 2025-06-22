@@ -1,0 +1,54 @@
+{
+  "name": "@ur-wesley/commenter",
+  "version": "1.0.0",
+  "description": "A performant CLI tool that safely removes single-line comments from source code files",
+  "main": "index.js",
+  "bin": {
+    "commenter": "./bin/commenter",
+    "comment-remover": "./bin/commenter"
+  },
+  "scripts": {
+    "install": "node install.js",
+    "postinstall": "node install.js",
+    "test": "npm run build:test && npm run test:cli",
+    "build:test": "go build -o commenter-test.exe",
+    "test:cli": "node test/npm-test.js",
+    "prepack": "node install.js"
+  },
+  "keywords": [
+    "comments",
+    "code",
+    "cli",
+    "typescript",
+    "javascript",
+    "go",
+    "sql",
+    "remove-comments",
+    "source-code",
+    "development-tools"
+  ],
+  "author": "Comment Remover Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ur-wesley/commentRemover.git"
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "os": [
+    "win32",
+    "linux",
+    "darwin"
+  ],
+  "preferGlobal": true,
+  "files": [
+    "bin/",
+    "install.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
