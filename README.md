@@ -2,8 +2,6 @@
 
 A performant CLI tool written in Go that safely removes single-line comments from source code files.
 
-> **Note**: This tool was renamed from `cr` to `commenter` to avoid conflicts with the existing Unix `cr` command that converts text files between Unix and DOS line endings.
-
 ## Features
 
 - **Safe comment removal**: Only removes single-line comments that are not part of multi-line comments or inside string literals
