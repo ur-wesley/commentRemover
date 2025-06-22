@@ -1,6 +1,6 @@
 {
   "name": "@ur-wesley/commenter",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A performant CLI tool that safely removes single-line comments from source code files",
   "main": "index.js",
   "bin": {
