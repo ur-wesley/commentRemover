@@ -62,7 +62,6 @@ func ProcessFile(filePath string, lang Language, consecutive bool, removeSingleL
 
 		processedLine, removed := RemoveSingleLineComment(line, lang, inMultiLineComment, consecutive, isConsecutive)
 
-		// Remove single-line multi-line comments if the flag is set
 		if !removed && removeSingleLineMultiline && lang.MultiLineStart != "" && lang.MultiLineEnd != "" {
 			if singleLine, content := RemoveSingleLineMultilineComment(line, lang); singleLine {
 				removed = true
@@ -252,14 +251,12 @@ func WriteFile(filePath string, lines []string) error {
 	return nil
 }
 
-// RemoveSingleLineMultilineComment removes multi-line comments that start and end on the same line
 func RemoveSingleLineMultilineComment(line string, lang Language) (bool, string) {
 	trimmed := strings.TrimSpace(line)
 	if strings.HasPrefix(trimmed, lang.MultiLineStart) && strings.HasSuffix(trimmed, lang.MultiLineEnd) &&
 		strings.Count(trimmed, lang.MultiLineStart) == 1 && strings.Count(trimmed, lang.MultiLineEnd) == 1 {
 		inner := strings.TrimSpace(trimmed[len(lang.MultiLineStart) : len(trimmed)-len(lang.MultiLineEnd)])
 		if inner != "" {
-			// Only remove if there is non-whitespace content between the markers
 			return true, line
 		}
 	}
