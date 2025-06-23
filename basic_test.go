@@ -245,10 +245,8 @@ func TestProcessFile(t *testing.T) {
 
 import "fmt"
 
-// This is a comment to remove
 func main() {
-	// Another comment
-	fmt.Println("Hello") // Inline comment
+	fmt.Println("Hello")
 	/* This is a multi-line comment
 	   // This should NOT be removed
 	   End of multi-line comment */

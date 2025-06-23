@@ -21,40 +21,38 @@ type PackageJSON struct {
 }
 
 func getVersionFromPackageJSON() string {
-	// Try to find package.json in the same directory as the executable
 	execPath, err := os.Executable()
 	if err != nil {
-		return version // fallback to build-time version
+		return version
 	}
 
 	packageJSONPath := filepath.Join(filepath.Dir(execPath), "package.json")
 
-	// If not found next to executable, try current working directory
 	if _, err := os.Stat(packageJSONPath); os.IsNotExist(err) {
 		packageJSONPath = "package.json"
 	}
 
 	file, err := os.Open(packageJSONPath)
 	if err != nil {
-		return version // fallback to build-time version
+		return version
 	}
 	defer file.Close()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return version // fallback to build-time version
+		return version
 	}
 
 	var pkg PackageJSON
 	if err := json.Unmarshal(data, &pkg); err != nil {
-		return version // fallback to build-time version
+		return version
 	}
 
 	if pkg.Version != "" {
 		return pkg.Version
 	}
 
-	return version // fallback to build-time version
+	return version
 }
 
 func main() {

@@ -40,7 +40,6 @@ async function testCommenter() {
  console.log("🧪 Testing Comment Remover npm package...\n");
 
  try {
-  // Test 1: Check if binary exists
   const binaryPath = path.join(__dirname, "..", "bin", "commenter");
   const binaryExists = fs.existsSync(binaryPath);
 
@@ -50,17 +49,14 @@ async function testCommenter() {
    return false;
   }
 
-  // Test 2: Test help command
   console.log("\n🔍 Testing help command...");
   const helpResult = await runCommand(binaryPath, ["--help"]);
   console.log("✅ Help command works");
 
-  // Test 3: Test version command
   console.log("\n📋 Testing version command...");
   const versionResult = await runCommand(binaryPath, ["--version"]);
   console.log("✅ Version command works");
 
-  // Test 4: Test with a sample file
   console.log("\n📝 Testing with sample file...");
   const testFile = path.join(__dirname, "..", "test_examples", "example.ts");
 
@@ -71,7 +67,6 @@ async function testCommenter() {
    console.log("⚠️  Sample file not found, skipping file test");
   }
 
-  // Test 5: Test bun run compatibility
   console.log("\n🚀 Testing bun run compatibility...");
   try {
    const bunResult = await runCommand("node", [

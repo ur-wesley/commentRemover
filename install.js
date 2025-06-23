@@ -105,7 +105,6 @@ async function setupBinary() {
 
  const binaryPath = path.join(binDir, BINARY_NAME + getBinaryExtension());
 
- // Check if binary already exists
  if (fs.existsSync(binaryPath)) {
   console.log("✅ Binary already exists, skipping download");
   return;
@@ -145,7 +144,6 @@ async function setupBinary() {
    "⚠️  Failed to download from GitHub releases, checking for existing binary..."
   );
 
-  // Check if there's an existing binary in the package (for development or manual placement)
   const possibleBinaries = [
    path.join(__dirname, BINARY_NAME + getBinaryExtension()),
    path.join(__dirname, "commenter" + getBinaryExtension()),

@@ -198,7 +198,6 @@ func BenchmarkDiscoverFilesRecursive(b *testing.B) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Create test files
 	for i := 0; i < 5; i++ {
 		for j := 0; j < 5; j++ {
 			subDir := fmt.Sprintf("%s/dir%d/subdir%d", tempDir, i, j)
