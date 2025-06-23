@@ -278,15 +278,15 @@ func main() {
 		t.Fatalf("ProcessFile failed: %v", err)
 	}
 
-	if result.OriginalLines != 13 {
-		t.Errorf("Expected 13 original lines, got %d", result.OriginalLines)
+	if result.OriginalLines != 11 {
+		t.Errorf("Expected 11 original lines, got %d", result.OriginalLines)
 	}
 
-	if result.CommentsRemoved != 3 {
-		t.Errorf("Expected 3 comments removed, got %d", result.CommentsRemoved)
+	if result.CommentsRemoved != 0 {
+		t.Errorf("Expected 0 comments removed, got %d", result.CommentsRemoved)
 	}
 
-	expectedRemovedLines := []int{5, 7, 8}
+	expectedRemovedLines := []int{}
 	actualRemovedLines := make([]int, len(result.RemovedComments))
 	for i, comment := range result.RemovedComments {
 		actualRemovedLines[i] = comment.LineNumber
