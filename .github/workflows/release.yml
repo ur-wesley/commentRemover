@@ -57,10 +57,13 @@ jobs:
    - name: Build binaries
      run: |
       # Build for Linux
-      GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${{ steps.version.outputs.PACKAGE_VERSION }} -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/cr-linux-amd64 .
+      GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${{ steps.version.outputs.PACKAGE_VERSION }} -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/commenter .
 
       # Build for Windows 
-      GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${{ steps.version.outputs.PACKAGE_VERSION }} -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/ModHelper.exe .
+      GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${{ steps.version.outputs.PACKAGE_VERSION }} -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/commenter.exe .
+
+      # Build for macOS
+      GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${{ steps.version.outputs.PACKAGE_VERSION }} -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/commenter-darwin .
 
    - name: Create checksums
      run: |
@@ -75,8 +78,9 @@ jobs:
       name: Release ${{ steps.version.outputs.VERSION }}
       generate_release_notes: true
       files: |
-       bin/cr-linux-amd64
-       bin/ModHelper.exe
+       bin/commenter
+       bin/commenter.exe
+       bin/commenter-darwin
        bin/checksums.txt
        README.md
        LICENSE
@@ -102,6 +106,7 @@ jobs:
       CURRENT_VERSION=$(node -p "require('./package.json').version")
       if [ "$VERSION" != "$CURRENT_VERSION" ]; then
         npm version $VERSION --no-git-tag-version
+        echo "Updated package.json to version $VERSION"
       else
         echo "package.json already at version $VERSION"
       fi

@@ -23,18 +23,24 @@ A performant CLI tool written in Go that safely removes single-line comments fro
 
 ## Installation
 
-### Via npm (recommended)
+### Via npm/bun (recommended)
+
+The tool automatically downloads the latest pre-built binary from GitHub releases for your platform.
 
 ```bash
 # Install globally with npm
-npm install -g commenter
+npm install -g @ur-wesley/commenter
 
 # Or use with npx (no installation required)
-npx commenter <file/path>
+npx @ur-wesley/commenter <file/path>
 
 # Or use with bun
-bun add -g commenter
-bunx commenter <file/path>
+bun add -g @ur-wesley/commenter
+bunx @ur-wesley/commenter <file/path>
+
+# Or install locally and use with bun run
+bun add @ur-wesley/commenter
+bun run commenter <file/path>
 ```
 
 ### Via Go (build from source)
@@ -45,9 +51,9 @@ go install github.com/ur-wesley/commentRemover@latest
 
 ### Manual Installation
 
-1. Download the binary from releases
+1. Download the binary from [GitHub releases](https://github.com/ur-wesley/commentRemover/releases)
 2. Add to your PATH
-3. Or build from source: `make install`
+3. Or build from source: `go build -o commenter .`
 
 ## Usage
 
@@ -92,8 +98,12 @@ commenter --write example.go
 commenter -w src/components/Button.tsx    # Short flag
 
 # Use with npm runners
-npx commenter -w src/utils/helper.ts
-bunx commenter -nc build/output.sql       # Short flag for no-color
+npx @ur-wesley/commenter -w src/utils/helper.ts
+bunx @ur-wesley/commenter -nc build/output.sql       # Short flag for no-color
+
+# Use with bun run (when installed locally)
+bun run commenter -w src/utils/helper.ts
+bun run commenter -nc build/output.sql
 
 # Combine flags for efficiency
 commenter -w -nc large-file.sql           # Write with no colors
@@ -219,246 +229,5 @@ Here are some popular languages you might want to add:
     Name:            "Python",
     Extensions:      []string{".py", ".pyw"},
     SingleLineStart: "#",
-    MultiLineStart:  `"""`,
-    MultiLineEnd:    `"""`,
-},
-
-// Ruby
-"ruby": {
-    Name:            "Ruby",
-    Extensions:      []string{".rb", ".rbw"},
-    SingleLineStart: "#",
-    MultiLineStart:  "=begin",
-    MultiLineEnd:    "=end",
-},
-
-// PHP
-"php": {
-    Name:            "PHP",
-    Extensions:      []string{".php", ".phtml"},
-    SingleLineStart: "//",
-    MultiLineStart:  "/*",
-    MultiLineEnd:    "*/",
-},
-
-// Java
-"java": {
-    Name:            "Java",
-    Extensions:      []string{".java"},
-    SingleLineStart: "//",
-    MultiLineStart:  "/*",
-    MultiLineEnd:    "*/",
-},
-
-// C#
-"csharp": {
-    Name:            "C#",
-    Extensions:      []string{".cs"},
-    SingleLineStart: "//",
-    MultiLineStart:  "/*",
-    MultiLineEnd:    "*/",
-},
-
-// Rust
-"rust": {
-    Name:            "Rust",
-    Extensions:      []string{".rs"},
-    SingleLineStart: "//",
-    MultiLineStart:  "/*",
-    MultiLineEnd:    "*/",
-},
-
-// Swift
-"swift": {
-    Name:            "Swift",
-    Extensions:      []string{".swift"},
-    SingleLineStart: "//",
-    MultiLineStart:  "/*",
-    MultiLineEnd:    "*/",
-},
-
-// Kotlin
-"kotlin": {
-    Name:            "Kotlin",
-    Extensions:      []string{".kt", ".kts"},
-    SingleLineStart: "//",
-    MultiLineStart:  "/*",
-    MultiLineEnd:    "*/",
-},
-
-// Shell Scripts
-"shell": {
-    Name:            "Shell Script",
-    Extensions:      []string{".sh", ".bash", ".zsh", ".fish"},
-    SingleLineStart: "#",
-    MultiLineStart:  "",
-    MultiLineEnd:    "",
-},
-```
-
-</details>
-
-### Step 5: Contributing Back
-
-Consider contributing your language additions back to the project:
-
-1. **Fork the repository**
-2. **Add your language definitions**
-3. **Add test cases** in `test_examples/`
-4. **Update documentation**
-5. **Submit a pull request**
-
-Your contributions help make this tool more useful for everyone! 🚀
-
-## Project Structure
-
-The codebase is organized into focused modules for maintainability:
-
-- `main.go` - CLI parsing and application orchestration
-- `const.go` - Language definitions and supported file types
-- `processor.go` - Core comment removal logic and file processing
-- `discovery.go` - File/directory discovery and batch processing
-- `ui.go` - Terminal output, colors, and user interface
-
-## Testing
-
-### Comprehensive Test Suite
-
-Run the full test suite with:
-
-```bash
-go test -v ./...                    # Run all unit tests
-go test -bench=. -benchmem         # Run performance benchmarks
-npm test                           # Test npm package functionality
-```
-
-### Test Coverage
-
-- **Unit Tests**: Complete coverage of core functionality
-- **Integration Tests**: File and directory processing
-- **Benchmark Tests**: Performance testing for large files
-- **CLI Tests**: End-to-end command-line interface testing
-- **npm Package Tests**: Node.js integration and installation
-
-### Test Categories
-
-- `*_test.go` - Unit tests for each module
-- `benchmark_test.go` - Performance benchmarks
-- `test/npm-test.js` - npm package integration tests
-
-## Building from Source
-
-1. Clone the repository
-2. Build the executable:
-   ```bash
-   make build
-   # or manually:
-   go build -o commenter
-   ```
-3. Install system-wide:
-   ```bash
-   make install
-   ```
-
-## Automated Releases
-
-### GoReleaser Integration
-
-- **Cross-platform builds**: Windows, macOS, Linux (amd64, arm64)
-- **Multiple package managers**: Homebrew, Scoop, Winget, npm
-- **Automated changelog generation**
-- **GitHub Releases with binaries and checksums**
-
-### CI/CD Pipeline
-
-- **GitHub Actions** for automated testing and releases
-- **Multi-OS testing** on Ubuntu, Windows, and macOS
-- **Go versions 1.20 and 1.21** compatibility
-- **Security scanning** with gosec
-- **Code quality** with golangci-lint
-
-### Release Process
-
-1. Create and push a git tag: `git tag v1.x.x && git push origin v1.x.x`
-2. GitHub Actions automatically:
-   - Runs full test suite across platforms
-   - Builds binaries for all supported platforms
-   - Creates GitHub release with changelog
-   - Updates package managers (Homebrew, Scoop, Winget)
-   - Publishes to npm registry
-
-### Package Manager Support
-
-- **npm**: `npm install -g commenter` or `npx commenter`
-- **Homebrew** (planned): `brew install your-username/tap/commenter`
-- **Scoop** (planned): `scoop install commenter`
-- **Winget** (planned): `winget install commenter`
-
-## Example Output
-
-**Single File:**
-
-```
-📁 File: example.go (Go)
-Original lines: 27
-Comments removed: 7
-Remaining lines: 15
-
-Removed comments:
-  Line 5: // This is a standalone comment
-  Line 8: fmt.Println("Hello") // Inline comment
-  ...
-
-Run with --write to apply changes to the file.
-```
-
-**Directory/Batch Processing:**
-
-```
-Batch Processing Summary:
-Files processed: 15
-Total comments removed: 89
-Total lines processed: 1,247
-Files written successfully: 15
-
-Run with --write to apply changes to all files.
-```
-
-## Why "commenter" instead of "cr"?
-
-The original name `cr` conflicts with an existing Unix command that converts text files between Unix and DOS line endings. To avoid this conflict and ensure compatibility across all systems, we renamed the tool to `commenter`.
-
-## CLI Reference
-
-| Short Flag | Long Flag     | Description                                   |
-| ---------- | ------------- | --------------------------------------------- |
-| `-w`       | `--write`     | Write changes to file (default: preview only) |
-| `-r`       | `--recursive` | Process directories recursively               |
-| `-nc`      | `--no-color`  | Disable colored output                        |
-| `-h`       | `--help`      | Show detailed help message                    |
-| `-v`       | `--version`   | Show version information                      |
-
-## Advanced Usage
-
-```bash
-# Process entire project recursively
-commenter -r .                           # Preview all files
-commenter -w -r .                        # Process and save all files
-
-# Process specific directories
-commenter -r src/                        # Just the src directory
-commenter -w -r src/ tests/              # Multiple directories (requires multiple commands)
-
-# Legacy batch processing (still works)
-find . -name "*.ts" -exec commenter -w {} \;
-
-# Use in CI/CD pipelines with no color output
-commenter -w -r -nc src/                 # Process directory tree
-commenter --write --recursive --no-color src/  # Long flags (explicit)
-
-# Combine with other tools
-commenter -w -r src/ && npm run format
-
-# Get help quickly
-commenter -h                             # Show help
+    MultiLineStart:  `
 ```

@@ -43,7 +43,60 @@ function getBinaryExtension() {
  return os.platform() === "win32" ? ".exe" : "";
 }
 
-function setupBinary() {
+function downloadBinary(url, dest) {
+ return new Promise((resolve, reject) => {
+  const file = fs.createWriteStream(dest);
+  https
+   .get(url, (response) => {
+    if (response.statusCode === 302 || response.statusCode === 301) {
+     file.close();
+     fs.unlink(dest, () => {});
+     return downloadBinary(response.headers.location, dest)
+      .then(resolve)
+      .catch(reject);
+    }
+    if (response.statusCode !== 200) {
+     file.close();
+     fs.unlink(dest, () => {});
+     reject(
+      new Error(
+       `HTTP ${response.statusCode}: ${response.statusMessage} for ${url}`
+      )
+     );
+     return;
+    }
+    response.pipe(file);
+    file.on("finish", () => {
+     file.close();
+     resolve();
+    });
+    file.on("error", (err) => {
+     file.close();
+     fs.unlink(dest, () => {});
+     reject(err);
+    });
+   })
+   .on("error", (err) => {
+    file.close();
+    fs.unlink(dest, () => {});
+    reject(err);
+   });
+ });
+}
+
+async function getLatestVersion() {
+ return new Promise((resolve, reject) => {
+  const packageJsonPath = path.join(__dirname, "package.json");
+  try {
+   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+   resolve(packageJson.version);
+  } catch (error) {
+   reject(error);
+  }
+ });
+}
+
+async function setupBinary() {
  const binDir = path.join(__dirname, "bin");
 
  if (!fs.existsSync(binDir)) {
@@ -52,52 +105,89 @@ function setupBinary() {
 
  const binaryPath = path.join(binDir, BINARY_NAME + getBinaryExtension());
 
+ // Check if binary already exists
+ if (fs.existsSync(binaryPath)) {
+  console.log("✅ Binary already exists, skipping download");
+  return;
+ }
+
  try {
-  console.log("🔨 Building from source...");
-  const buildCmd = `go build -o "${binaryPath}" .`;
-  execSync(buildCmd, {
-   cwd: __dirname,
-   stdio: "inherit",
-   env: { ...process.env },
-  });
+  console.log("📦 Downloading prebuilt binary from GitHub releases...");
+
+  const version = await getLatestVersion();
+  const platform = getPlatform();
+
+  let binaryName;
+
+  if (platform === "windows") {
+   binaryName = "commenter.exe";
+  } else if (platform === "darwin") {
+   binaryName = "commenter-darwin";
+  } else {
+   binaryName = "commenter";
+  }
+
+  const downloadUrl = `${REPO_URL}/releases/download/v${version}/${binaryName}`;
+  console.log(`Downloading from: ${downloadUrl}`);
+
+  await downloadBinary(downloadUrl, binaryPath);
 
   if (os.platform() !== "win32") {
    fs.chmodSync(binaryPath, "755");
   }
 
-  console.log("✅ Successfully built commenter from source!");
+  console.log(
+   "✅ Successfully downloaded and installed commenter from GitHub releases!"
+  );
   return;
  } catch (error) {
-  console.log("⚠️  Go not found or build failed, trying prebuilt binary...");
- }
+  console.log(
+   "⚠️  Failed to download from GitHub releases, checking for existing binary..."
+  );
 
- const existingBinary = path.join(__dirname, "cr" + getBinaryExtension());
- if (fs.existsSync(existingBinary)) {
-  console.log("📦 Using existing binary...");
-  fs.copyFileSync(existingBinary, binaryPath);
+  // Check if there's an existing binary in the package (for development or manual placement)
+  const possibleBinaries = [
+   path.join(__dirname, BINARY_NAME + getBinaryExtension()),
+   path.join(__dirname, "commenter" + getBinaryExtension()),
+   path.join(__dirname, "commenter-darwin"),
+   path.join(__dirname, "cr" + getBinaryExtension()),
+  ];
 
-  if (os.platform() !== "win32") {
-   fs.chmodSync(binaryPath, "755");
+  for (const existingBinary of possibleBinaries) {
+   if (fs.existsSync(existingBinary)) {
+    console.log("📦 Found existing binary, copying to bin directory...");
+    fs.copyFileSync(existingBinary, binaryPath);
+
+    if (os.platform() !== "win32") {
+     fs.chmodSync(binaryPath, "755");
+    }
+
+    console.log("✅ Successfully installed commenter from existing binary!");
+    return;
+   }
   }
 
-  console.log("✅ Successfully installed commenter!");
-  return;
+  console.log(
+   "❌ Failed to download from GitHub releases and no existing binary found."
+  );
+  console.log("📝 Please ensure:");
+  console.log("   1. You have internet connection");
+  console.log(
+   "   2. The GitHub release exists for version " + (await getLatestVersion())
+  );
+  console.log(
+   "   3. Or manually download the binary from: " + REPO_URL + "/releases"
+  );
+  process.exit(1);
  }
-
- console.log("❌ No prebuilt binary found and Go build failed.");
- console.log("📝 Manual installation required:");
- console.log("   1. Install Go from https://golang.org/");
- console.log("   2. Run: go build -o commenter");
- console.log("   3. Move the binary to your PATH");
- process.exit(1);
 }
 
-function main() {
- console.log("🚀 Installing Comment Remover...");
+async function main() {
+ console.log("🚀 Installing Comment Remover from GitHub releases...");
  console.log(`Platform: ${getPlatform()}-${getArch()}`);
 
  try {
-  setupBinary();
+  await setupBinary();
 
   console.log("");
   console.log("🎉 Installation complete!");
@@ -112,6 +202,8 @@ function main() {
   console.log("  commenter -h               # Show help (short)");
   console.log("");
   console.log("Supported file types: .ts, .tsx, .js, .jsx, .go, .sql, .json");
+  console.log("");
+  console.log("💡 You can also run with: bun run commenter");
  } catch (error) {
   console.error("❌ Installation failed:", error.message);
   process.exit(1);
