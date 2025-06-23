@@ -82,6 +82,7 @@ func showHelpMessage(useColor bool) {
 	fmt.Printf("  %s-w, --write%s      Write changes to file instead of just logging\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
 	fmt.Printf("  %s-r, --recursive%s  Process directories recursively (default: true)\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
 	fmt.Printf("  %s-c, --consecutive%s Remove consecutive single-line comments (default: false)\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
+	fmt.Printf("  %s-e, --exclude%s    Comma-separated glob patterns to exclude (e.g., '*test.go,*.min.js')\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
 	fmt.Printf("  %s-nc, --no-color%s  Disable colored output\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
 	fmt.Printf("  %s-nwl, --no-warn-large%s Disable warnings for large files (>500 LOC)\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
 	fmt.Printf("  %s-h, --help%s       Show this help message\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
@@ -108,6 +109,7 @@ func showHelpMessage(useColor bool) {
 	fmt.Printf("  %s \"*.go\"%s                      # Process all .go files in current directory\n", programName, "")
 	fmt.Printf("  %s \"./src/**/*.ts\"%s             # Process all .ts files recursively in src\n", programName, "")
 	fmt.Printf("  %s %s-w%s \"src/**/*.{ts,js}\"%s       # Process and save .ts/.js files in src\n", programName, colorize(useColor, ColorGreen), colorize(useColor, ColorReset), "")
+	fmt.Printf("  %s %s-e%s \"*test.go,*.min.js\"%s       # Exclude test files and minified files\n", programName, colorize(useColor, ColorGreen), colorize(useColor, ColorReset), "")
 	fmt.Printf("  %s %s-c%s file.ts%s                   # Remove consecutive comments too\n", programName, colorize(useColor, ColorGreen), colorize(useColor, ColorReset), "")
 	fmt.Printf("  %s %s-w -nc%s src/utils.js%s          # Save with no colors\n\n", programName, colorize(useColor, ColorGreen), colorize(useColor, ColorReset), "")
 

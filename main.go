@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -65,6 +66,7 @@ func main() {
 	var showVersion bool
 	var consecutive bool
 	var noWarnLarge bool
+	var excludePatterns string
 
 	flag.BoolVar(&write, "write", false, "Write changes to file instead of just logging")
 	flag.BoolVar(&write, "w", false, "Write changes to file (shorthand)")
@@ -76,18 +78,29 @@ func main() {
 	flag.BoolVar(&noColor, "nc", false, "Disable colored output (shorthand)")
 	flag.BoolVar(&noWarnLarge, "no-warn-large", false, "Disable warnings for large files (>500 LOC)")
 	flag.BoolVar(&noWarnLarge, "nwl", false, "Disable warnings for large files (shorthand)")
+	flag.StringVar(&excludePatterns, "exclude", "", "Comma-separated glob patterns to exclude (e.g., '*test.go,*.min.js')")
+	flag.StringVar(&excludePatterns, "e", "", "Exclude patterns (shorthand)")
 	flag.BoolVar(&showHelp, "help", false, "Show help message")
 	flag.BoolVar(&showHelp, "h", false, "Show help message (shorthand)")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&showVersion, "v", false, "Show version information (shorthand)")
 	flag.Parse()
 
+	var excludeGlobs []string
+	if excludePatterns != "" {
+		excludeGlobs = strings.Split(excludePatterns, ",")
+		for i, pattern := range excludeGlobs {
+			excludeGlobs[i] = strings.TrimSpace(pattern)
+		}
+	}
+
 	options := ProcessingOptions{
-		Write:       write,
-		NoColor:     noColor,
-		Recursive:   recursive,
-		Consecutive: consecutive,
-		NoWarnLarge: noWarnLarge,
+		Write:           write,
+		NoColor:         noColor,
+		Recursive:       recursive,
+		Consecutive:     consecutive,
+		NoWarnLarge:     noWarnLarge,
+		ExcludePatterns: excludeGlobs,
 	}
 
 	useColor := !noColor && isTerminal()
@@ -111,7 +124,7 @@ func main() {
 		inputPath = flag.Arg(0)
 	}
 
-	files, err := DiscoverFiles(inputPath, recursive)
+	files, err := DiscoverFiles(inputPath, recursive, options.ExcludePatterns)
 	if err != nil {
 		printError(useColor, "%v", err)
 		os.Exit(1)

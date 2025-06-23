@@ -6,15 +6,18 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	ignore "github.com/sabhiram/go-gitignore"
 )
 
 type ProcessingOptions struct {
-	Write       bool
-	NoColor     bool
-	Recursive   bool
-	Consecutive bool
-	NoWarnLarge bool
-	Extensions  []string
+	Write           bool
+	NoColor         bool
+	Recursive       bool
+	Consecutive     bool
+	NoWarnLarge     bool
+	Extensions      []string
+	ExcludePatterns []string
 }
 
 type ProcessingStats struct {
@@ -61,7 +64,7 @@ func DiscoverGlobFiles(pattern string) ([]FileInfo, error) {
 	return files, nil
 }
 
-func DiscoverFiles(inputPath string, recursive bool) ([]FileInfo, error) {
+func DiscoverFiles(inputPath string, recursive bool, excludePatterns []string) ([]FileInfo, error) {
 	var files []FileInfo
 
 	if strings.Contains(inputPath, "*") || strings.Contains(inputPath, "?") || strings.Contains(inputPath, "[") {
@@ -73,8 +76,43 @@ func DiscoverFiles(inputPath string, recursive bool) ([]FileInfo, error) {
 		return nil, fmt.Errorf("path does not exist: %s", inputPath)
 	}
 
+	var ignorePatterns []string
+	var dirToCheck string
 	if stat.IsDir() {
-		err = processDirectory(inputPath, recursive, &files)
+		dirToCheck = inputPath
+	} else {
+		dirToCheck = filepath.Dir(inputPath)
+	}
+
+	gitignorePath := filepath.Join(dirToCheck, ".gitignore")
+	if data, err := os.ReadFile(gitignorePath); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+				ignorePatterns = append(ignorePatterns, trimmed)
+			}
+		}
+	}
+
+	commenterignorePath := filepath.Join(dirToCheck, ".commenterignore")
+	if data, err := os.ReadFile(commenterignorePath); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+				ignorePatterns = append(ignorePatterns, trimmed)
+			}
+		}
+	}
+
+	var ign *ignore.GitIgnore
+	if len(ignorePatterns) > 0 {
+		ign = ignore.CompileIgnoreLines(ignorePatterns...)
+	}
+
+	if stat.IsDir() {
+		err = processDirectory(inputPath, recursive, &files, ign, excludePatterns)
 		if err != nil {
 			return nil, err
 		}
@@ -83,26 +121,52 @@ func DiscoverFiles(inputPath string, recursive bool) ([]FileInfo, error) {
 		if !supported {
 			return nil, fmt.Errorf("unsupported file type: %s", filepath.Ext(inputPath))
 		}
-		files = append(files, FileInfo{
-			Path:     inputPath,
-			Language: *lang,
-		})
+		if ign == nil || !ign.MatchesPath(filepath.Base(inputPath)) {
+			if !matchesExcludePatterns(inputPath, excludePatterns) {
+				files = append(files, FileInfo{
+					Path:     inputPath,
+					Language: *lang,
+				})
+			}
+		}
 	}
 
 	return files, nil
 }
 
-func processDirectory(dirPath string, recursive bool, files *[]FileInfo) error {
+func matchesExcludePatterns(filePath string, patterns []string) bool {
+	if len(patterns) == 0 {
+		return false
+	}
+
+	fileName := filepath.Base(filePath)
+	for _, pattern := range patterns {
+		if matched, err := filepath.Match(pattern, fileName); err == nil && matched {
+			return true
+		}
+	}
+	return false
+}
+
+func processDirectory(dirPath string, recursive bool, files *[]FileInfo, ign *ignore.GitIgnore, excludePatterns []string) error {
 	if recursive {
 		return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-
+			relPath, _ := filepath.Rel(dirPath, path)
+			if ign != nil && ign.MatchesPath(relPath) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
 			if info.IsDir() {
 				return nil
 			}
-
+			if matchesExcludePatterns(path, excludePatterns) {
+				return nil
+			}
 			lang, supported := GetLanguageByExtension(path)
 			if supported {
 				*files = append(*files, FileInfo{
@@ -110,7 +174,6 @@ func processDirectory(dirPath string, recursive bool, files *[]FileInfo) error {
 					Language: *lang,
 				})
 			}
-
 			return nil
 		})
 	} else {
@@ -118,13 +181,18 @@ func processDirectory(dirPath string, recursive bool, files *[]FileInfo) error {
 		if err != nil {
 			return err
 		}
-
 		for _, entry := range entries {
+			fullPath := filepath.Join(dirPath, entry.Name())
+			relPath, _ := filepath.Rel(dirPath, fullPath)
+			if ign != nil && ign.MatchesPath(relPath) {
+				continue
+			}
 			if entry.IsDir() {
 				continue
 			}
-
-			fullPath := filepath.Join(dirPath, entry.Name())
+			if matchesExcludePatterns(fullPath, excludePatterns) {
+				continue
+			}
 			lang, supported := GetLanguageByExtension(fullPath)
 			if supported {
 				*files = append(*files, FileInfo{
@@ -134,7 +202,6 @@ func processDirectory(dirPath string, recursive bool, files *[]FileInfo) error {
 			}
 		}
 	}
-
 	return nil
 }
 
