@@ -39,6 +39,21 @@ func TestGetLanguageByExtension(t *testing.T) {
 			supported:    true,
 		},
 		{
+			filename:     "script.php",
+			expectedLang: "PHP",
+			supported:    true,
+		},
+		{
+			filename:     "template.phtml",
+			expectedLang: "PHP",
+			supported:    true,
+		},
+		{
+			filename:     "Program.cs",
+			expectedLang: "C#",
+			supported:    true,
+		},
+		{
 			filename:     "README.md",
 			expectedLang: "",
 			supported:    false,
@@ -197,6 +212,72 @@ func TestUpdateMultiLineCommentState(t *testing.T) {
 	}
 }
 
+func TestJSXCommentDetection(t *testing.T) {
+	lang := Language{
+		Name:            "TypeScript/JavaScript",
+		Extensions:      []string{".ts", ".tsx", ".js", ".jsx"},
+		SingleLineStart: "//",
+		MultiLineStart:  "/*",
+		MultiLineEnd:    "*/",
+		AdditionalMultiLinePatterns: []MultiLinePattern{
+			{Start: "{/*", End: "*/}"},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		input        string
+		currentState bool
+		expected     bool
+	}{
+		{
+			name:         "start JSX comment",
+			input:        "  {/* This is a JSX comment",
+			currentState: false,
+			expected:     true,
+		},
+		{
+			name:         "end JSX comment",
+			input:        "This ends a JSX comment */}",
+			currentState: true,
+			expected:     false,
+		},
+		{
+			name:         "complete JSX comment",
+			input:        "  {/* Complete JSX comment */}",
+			currentState: false,
+			expected:     false,
+		},
+		{
+			name:         "JSX comment with special chars",
+			input:        "  {/* Comment with -- // *** */}",
+			currentState: false,
+			expected:     false,
+		},
+		{
+			name:         "continue in JSX comment",
+			input:        "Still in JSX comment",
+			currentState: true,
+			expected:     true,
+		},
+		{
+			name:         "mixed JSX and regular comments",
+			input:        "  {/* JSX comment */} /* Regular comment",
+			currentState: false,
+			expected:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := UpdateMultiLineCommentState(tt.input, lang, tt.currentState)
+			if result != tt.expected {
+				t.Errorf("Expected %v, got %v for input %q with state %v", tt.expected, result, tt.input, tt.currentState)
+			}
+		})
+	}
+}
+
 func TestIsInsideStringLiteral(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -273,7 +354,7 @@ func main() {
 		MultiLineEnd:    "*/",
 	}
 
-	result, err := ProcessFile(tmpFile.Name(), lang, false)
+	result, err := ProcessFile(tmpFile.Name(), lang, false, false)
 	if err != nil {
 		t.Fatalf("ProcessFile failed: %v", err)
 	}
@@ -353,5 +434,201 @@ func TestDiscoverFiles(t *testing.T) {
 		if !extensions[ext] {
 			t.Errorf("Expected to find files with extension %s", ext)
 		}
+	}
+}
+
+func TestRemoveSingleLineMultilineComment(t *testing.T) {
+	lang := Language{
+		Name:            "Go",
+		Extensions:      []string{".go"},
+		SingleLineStart: "//",
+		MultiLineStart:  "/*",
+		MultiLineEnd:    "*/",
+	}
+
+	// Single-line multi-line comment
+	line := "   /* This is a single-line multi-line comment */   "
+	removed, content := RemoveSingleLineMultilineComment(line, lang)
+	if !removed {
+		t.Errorf("Expected single-line multi-line comment to be removed")
+	}
+	if content != line {
+		t.Errorf("Expected content to match original line")
+	}
+
+	// Not a single-line multi-line comment (just the markers)
+	line2 := "/* */"
+	removed2, _ := RemoveSingleLineMultilineComment(line2, lang)
+	if removed2 {
+		t.Errorf("Did not expect just the markers to be removed as single-line comment")
+	}
+}
+
+func TestProcessFile_RemoveSingleLineMultiline(t *testing.T) {
+	content := `package main
+
+func main() {
+	fmt.Println("Hello")
+	/* This is a multi-line comment
+	   // This should NOT be removed
+	   End of multi-line comment */
+	fmt.Println("String with // comment inside")
+	/* Single-line multi-line comment */
+}`
+
+	tmpFile, err := os.CreateTemp("", "test_*.go")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	lang := Language{
+		Name:            "Go",
+		Extensions:      []string{".go"},
+		SingleLineStart: "//",
+		MultiLineStart:  "/*",
+		MultiLineEnd:    "*/",
+	}
+
+	result, err := ProcessFile(tmpFile.Name(), lang, false, true)
+	if err != nil {
+		t.Fatalf("ProcessFile failed: %v", err)
+	}
+
+	if result.CommentsRemoved != 1 {
+		t.Errorf("Expected 1 comment removed, got %d", result.CommentsRemoved)
+	}
+
+	for _, comment := range result.RemovedComments {
+		if !strings.Contains(comment.Content, "Single-line multi-line comment") {
+			t.Errorf("Expected removed comment to be the single-line multi-line comment, got: %s", comment.Content)
+		}
+	}
+
+	modifiedContent := strings.Join(result.ModifiedLines, "\n")
+	if strings.Contains(modifiedContent, "/* Single-line multi-line comment */") {
+		t.Error("Single-line multi-line comment should be removed")
+	}
+}
+
+func TestPHPCommentRemoval(t *testing.T) {
+	content := `<?php
+// This is a single-line comment
+/* This is a multi-line comment
+   that spans multiple lines */
+
+class Example {
+    // Class property comment
+    private $name = "test";
+    
+    /* Single-line multi-line comment */
+    
+    public function __construct() {
+        // Constructor comment
+        echo "Hello World"; // Inline comment
+    }
+}`
+
+	tmpFile, err := os.CreateTemp("", "test_*.php")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	lang := Language{
+		Name:            "PHP",
+		Extensions:      []string{".php", ".phtml"},
+		SingleLineStart: "//",
+		MultiLineStart:  "/*",
+		MultiLineEnd:    "*/",
+	}
+
+	result, err := ProcessFile(tmpFile.Name(), lang, false, false)
+	if err != nil {
+		t.Fatalf("ProcessFile failed: %v", err)
+	}
+
+	if result.CommentsRemoved != 4 {
+		t.Errorf("Expected 4 comments removed, got %d", result.CommentsRemoved)
+	}
+
+	modifiedContent := strings.Join(result.ModifiedLines, "\n")
+	if !strings.Contains(modifiedContent, "/* This is a multi-line comment") {
+		t.Error("Multi-line comment should be preserved")
+	}
+	if !strings.Contains(modifiedContent, "/* Single-line multi-line comment */") {
+		t.Error("Single-line multi-line comment should be preserved when flag is false")
+	}
+}
+
+func TestCSharpCommentRemoval(t *testing.T) {
+	content := `using System;
+
+// This is a single-line comment
+/* This is a multi-line comment
+   that spans multiple lines */
+
+namespace Example
+{
+    // Class comment
+    public class Program
+    {
+        // Property comment
+        public string Name { get; set; }
+        
+        /* Single-line multi-line comment */
+        
+        public void Test()
+        {
+            string message = "String with // comment inside";
+            Console.WriteLine(message);
+        }
+    }
+}`
+
+	tmpFile, err := os.CreateTemp("", "test_*.cs")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	lang := Language{
+		Name:            "C#",
+		Extensions:      []string{".cs"},
+		SingleLineStart: "//",
+		MultiLineStart:  "/*",
+		MultiLineEnd:    "*/",
+	}
+
+	result, err := ProcessFile(tmpFile.Name(), lang, false, true)
+	if err != nil {
+		t.Fatalf("ProcessFile failed: %v", err)
+	}
+
+	if result.CommentsRemoved != 4 {
+		t.Errorf("Expected 4 comments removed, got %d", result.CommentsRemoved)
+	}
+
+	modifiedContent := strings.Join(result.ModifiedLines, "\n")
+	if !strings.Contains(modifiedContent, "/* This is a multi-line comment") {
+		t.Error("Multi-line comment should be preserved")
+	}
+	if strings.Contains(modifiedContent, "/* Single-line multi-line comment */") {
+		t.Error("Single-line multi-line comment should be removed when flag is true")
 	}
 }

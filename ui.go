@@ -86,7 +86,9 @@ func showHelpMessage(useColor bool) {
 	fmt.Printf("  %s-nc, --no-color%s  Disable colored output\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
 	fmt.Printf("  %s-nwl, --no-warn-large%s Disable warnings for large files (>500 LOC)\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
 	fmt.Printf("  %s-h, --help%s       Show this help message\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
-	fmt.Printf("  %s-v, --version%s    Show version information\n\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
+	fmt.Printf("  %s-v, --version%s    Show version information\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
+	fmt.Printf("  %s-m, --remove-single-multiline%s Remove single-line comments using multi-line patterns (e.g., /* comment */)\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
+	fmt.Printf("\n")
 
 	fmt.Printf("%sSUPPORTED FILE TYPES:%s\n", colorize(useColor, ColorBold+ColorYellow), colorize(useColor, ColorReset))
 	for _, lang := range SupportedLanguages {
@@ -111,12 +113,15 @@ func showHelpMessage(useColor bool) {
 	fmt.Printf("  %s %s-w%s \"src/**/*.{ts,js}\"%s       # Process and save .ts/.js files in src\n", programName, colorize(useColor, ColorGreen), colorize(useColor, ColorReset), "")
 	fmt.Printf("  %s %s-e%s \"*test.go,*.min.js\"%s       # Exclude test files and minified files\n", programName, colorize(useColor, ColorGreen), colorize(useColor, ColorReset), "")
 	fmt.Printf("  %s %s-c%s file.ts%s                   # Remove consecutive comments too\n", programName, colorize(useColor, ColorGreen), colorize(useColor, ColorReset), "")
-	fmt.Printf("  %s %s-w -nc%s src/utils.js%s          # Save with no colors\n\n", programName, colorize(useColor, ColorGreen), colorize(useColor, ColorReset), "")
+	fmt.Printf("  %s %s-w -nc%s src/utils.js%s          # Save with no colors\n", programName, colorize(useColor, ColorGreen), colorize(useColor, ColorReset), "")
+	fmt.Printf("  %s %s-m%s file.js%s                   # Remove single-line multi-line comments\n", programName, colorize(useColor, ColorGreen), colorize(useColor, ColorReset), "")
+	fmt.Printf("\n")
 
 	fmt.Printf("%sWHAT GETS REMOVED:%s\n", colorize(useColor, ColorBold+ColorYellow), colorize(useColor, ColorReset))
 	fmt.Printf("  %s✓%s Standalone comment lines (e.g., %s// This is a comment%s)\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset), colorize(useColor, ColorDim), colorize(useColor, ColorReset))
 	fmt.Printf("  %s✓%s Inline comments (e.g., %scode(); // comment%s)\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset), colorize(useColor, ColorDim), colorize(useColor, ColorReset))
 	fmt.Printf("  %s✓%s Multiple consecutive single-line comments\n\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset))
+	fmt.Printf("  %s✓%s Single-line multi-line comments (e.g., %s/* comment */%s) [with -m]\n\n", colorize(useColor, ColorGreen), colorize(useColor, ColorReset), colorize(useColor, ColorDim), colorize(useColor, ColorReset))
 
 	fmt.Printf("%sWHAT GETS PRESERVED:%s\n", colorize(useColor, ColorBold+ColorYellow), colorize(useColor, ColorReset))
 	fmt.Printf("  %s×%s Multi-line comments (%s/* ... */%s)\n", colorize(useColor, ColorRed), colorize(useColor, ColorReset), colorize(useColor, ColorDim), colorize(useColor, ColorReset))

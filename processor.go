@@ -20,7 +20,7 @@ type RemovedComment struct {
 	Content    string
 }
 
-func ProcessFile(filePath string, lang Language, consecutive bool) (*CommentRemovalResult, error) {
+func ProcessFile(filePath string, lang Language, consecutive bool, removeSingleLineMultiline bool) (*CommentRemovalResult, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -61,6 +61,15 @@ func ProcessFile(filePath string, lang Language, consecutive bool) (*CommentRemo
 		isConsecutive := isPartOfConsecutiveComments(allLines, i, lang)
 
 		processedLine, removed := RemoveSingleLineComment(line, lang, inMultiLineComment, consecutive, isConsecutive)
+
+		// Remove single-line multi-line comments if the flag is set
+		if !removed && removeSingleLineMultiline && lang.MultiLineStart != "" && lang.MultiLineEnd != "" {
+			if singleLine, content := RemoveSingleLineMultilineComment(line, lang); singleLine {
+				removed = true
+				processedLine = "REMOVE_LINE"
+				originalLine = content
+			}
+		}
 
 		if removed {
 			removedComments = append(removedComments, RemovedComment{
@@ -103,7 +112,23 @@ func UpdateMultiLineCommentState(line string, lang Language, currentState bool) 
 			inComment = false
 			i += len(lang.MultiLineEnd)
 		} else {
-			i++
+			patternFound := false
+			for _, pattern := range lang.AdditionalMultiLinePatterns {
+				if !inComment && strings.HasPrefix(line[i:], pattern.Start) {
+					inComment = true
+					i += len(pattern.Start)
+					patternFound = true
+					break
+				} else if inComment && strings.HasPrefix(line[i:], pattern.End) {
+					inComment = false
+					i += len(pattern.End)
+					patternFound = true
+					break
+				}
+			}
+			if !patternFound {
+				i++
+			}
 		}
 	}
 
@@ -225,4 +250,18 @@ func WriteFile(filePath string, lines []string) error {
 	}
 
 	return nil
+}
+
+// RemoveSingleLineMultilineComment removes multi-line comments that start and end on the same line
+func RemoveSingleLineMultilineComment(line string, lang Language) (bool, string) {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, lang.MultiLineStart) && strings.HasSuffix(trimmed, lang.MultiLineEnd) &&
+		strings.Count(trimmed, lang.MultiLineStart) == 1 && strings.Count(trimmed, lang.MultiLineEnd) == 1 {
+		inner := strings.TrimSpace(trimmed[len(lang.MultiLineStart) : len(trimmed)-len(lang.MultiLineEnd)])
+		if inner != "" {
+			// Only remove if there is non-whitespace content between the markers
+			return true, line
+		}
+	}
+	return false, ""
 }

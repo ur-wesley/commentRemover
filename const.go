@@ -6,11 +6,17 @@ import (
 )
 
 type Language struct {
-	Name            string
-	Extensions      []string
-	SingleLineStart string
-	MultiLineStart  string
-	MultiLineEnd    string
+	Name                        string
+	Extensions                  []string
+	SingleLineStart             string
+	MultiLineStart              string
+	MultiLineEnd                string
+	AdditionalMultiLinePatterns []MultiLinePattern
+}
+
+type MultiLinePattern struct {
+	Start string
+	End   string
 }
 
 var SupportedLanguages = map[string]Language{
@@ -20,6 +26,9 @@ var SupportedLanguages = map[string]Language{
 		SingleLineStart: "//",
 		MultiLineStart:  "/*",
 		MultiLineEnd:    "*/",
+		AdditionalMultiLinePatterns: []MultiLinePattern{
+			{Start: "{/*", End: "*/}"},
+		},
 	},
 	"go": {
 		Name:            "Go",
@@ -41,6 +50,20 @@ var SupportedLanguages = map[string]Language{
 		SingleLineStart: "//",
 		MultiLineStart:  "",
 		MultiLineEnd:    "",
+	},
+	"php": {
+		Name:            "PHP",
+		Extensions:      []string{".php", ".phtml"},
+		SingleLineStart: "//",
+		MultiLineStart:  "/*",
+		MultiLineEnd:    "*/",
+	},
+	"csharp": {
+		Name:            "C#",
+		Extensions:      []string{".cs"},
+		SingleLineStart: "//",
+		MultiLineStart:  "/*",
+		MultiLineEnd:    "*/",
 	},
 }
 

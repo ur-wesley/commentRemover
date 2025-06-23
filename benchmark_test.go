@@ -117,7 +117,7 @@ func main() {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := ProcessFile(tmpFile.Name(), lang, false)
+		_, err := ProcessFile(tmpFile.Name(), lang, false, false)
 		if err != nil {
 			b.Fatalf("ProcessFile failed: %v", err)
 		}
@@ -184,7 +184,7 @@ func BenchmarkLargeFileProcessing(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := ProcessFile(tmpFile.Name(), lang, false)
+		_, err := ProcessFile(tmpFile.Name(), lang, false, false)
 		if err != nil {
 			b.Fatalf("ProcessFile failed: %v", err)
 		}

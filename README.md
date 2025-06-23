@@ -1,6 +1,6 @@
 # Comment Remover (commenter)
 
-A performant CLI tool written in Go that safely removes single-line comments from source code files.
+A performant CLI tool that safely removes single-line comments from source code files.
 
 ## Features
 
@@ -8,9 +8,8 @@ A performant CLI tool written in Go that safely removes single-line comments fro
 - **Multiple language support**: TypeScript/JavaScript, Go, SQL, and JSON
 - **Performance optimized**: Fast file processing with minimal memory usage
 - **Preview mode**: See what would be removed before making changes
-- **Detailed logging**: Shows line numbers and content of removed comments
-- **Colored output**: Beautiful colored terminal output with emoji icons (can be disabled with `--no-color`)
-- **Easy installation**: Available via npm/bun, or build from source
+- **Smart file filtering**: Respects `.gitignore` and `.commenterignore` files
+- **Flexible exclusion**: Use `--exclude` flag for runtime pattern exclusion
 
 ## Supported Languages
 
@@ -20,6 +19,8 @@ A performant CLI tool written in Go that safely removes single-line comments fro
 | Go                    | `.go`                        | `//`                |
 | SQL                   | `.sql`                       | `--`                |
 | JSON                  | `.json`                      | `//`                |
+| PHP                   | `.php`, `.phtml`             | `//`                |
+| C#                    | `.cs`                        | `//`                |
 
 ## Installation
 
@@ -31,12 +32,12 @@ The tool automatically downloads the latest pre-built binary from GitHub release
 # Install globally with npm
 npm install -g @ur-wesley/commenter
 
-# Or use with npx (no installation required)
+# Or use with npx (no installation required - auto-downloads binary)
 npx @ur-wesley/commenter <file/path>
 
 # Or use with bun
 bun add -g @ur-wesley/commenter
-bunx @ur-wesley/commenter <file/path>
+bunx @ur-wesley/commenter <file/path>  # Auto-downloads binary
 
 # Or install locally and use with bun run
 bun add @ur-wesley/commenter
@@ -73,6 +74,14 @@ commenter --write <file/path>
 commenter -w <file/path>              # Short flag
 commenter -w -r src/                  # Write changes recursively
 
+# Remove single-line multi-line comments (e.g., /* comment */)
+commenter --remove-single-multiline <file/path>
+commenter -m <file/path>              # Short flag
+
+# Exclude files with patterns
+commenter -e "*test.go,*.min.js" src/  # Exclude test and minified files
+commenter --exclude "*.spec.js" .      # Exclude spec files
+
 # Disable colored output
 commenter --no-color <file/path>
 commenter -nc <file/path>             # Short flag
@@ -80,10 +89,6 @@ commenter -nc <file/path>             # Short flag
 # Show help
 commenter --help
 commenter -h                          # Short flag
-
-# Combine flags
-commenter -w -nc <file/path>          # Write with no colors
-commenter -w -r -nc project/          # Recursive write with no colors
 ```
 
 ## Examples
@@ -105,8 +110,13 @@ bunx @ur-wesley/commenter -nc build/output.sql       # Short flag for no-color
 bun run commenter -w src/utils/helper.ts
 bun run commenter -nc build/output.sql
 
+# Exclude test files and minified files
+commenter -e "*test.go,*.min.js" src/
+commenter -w -e "*.spec.js" project/
+
 # Combine flags for efficiency
 commenter -w -nc large-file.sql           # Write with no colors
+commenter -m src/file.js                  # Remove single-line multi-line comments
 ```
 
 ## What gets removed
@@ -116,6 +126,7 @@ commenter -w -nc large-file.sql           # Write with no colors
 - Standalone comment lines (e.g., `// This is a comment`)
 - Inline comments (e.g., `code(); // comment`)
 - Multiple consecutive single-line comments
+- Single-line multi-line comments (e.g., `/* comment */`)
 
 ❌ **Preserves:**
 
@@ -123,111 +134,20 @@ commenter -w -nc large-file.sql           # Write with no colors
 - Comments inside string literals (`"string with // comment"`)
 - Single-line comments inside multi-line comment blocks
 
+## File Filtering
+
+The tool respects ignore files and patterns:
+
+- **`.gitignore`**: Standard Git ignore patterns
+- **`.commenterignore`**: Tool-specific ignore patterns (same syntax as `.gitignore`)
+- **`--exclude` flag**: Runtime glob patterns (e.g., `--exclude "*test.go,*.min.js"`)
+
+If both `.gitignore` and `.commenterignore` exist, both are respected (union of rules).
+
 ## Adding Support for New File Types
 
-Want to add support for a new programming language? It's easy! The tool uses a simple language definition system that you can extend.
+See [EXTENDING.md](EXTENDING.md) for detailed instructions on adding support for new programming languages.
 
-### Step 1: Update Language Definitions
+## License
 
-Edit the `const.go` file and add your new language to the `SupportedLanguages` map:
-
-```go
-var SupportedLanguages = map[string]Language{
-    // ... existing languages ...
-
-    "python": {
-        Name:            "Python",
-        Extensions:      []string{".py", ".pyw"},
-        SingleLineStart: "#",
-        MultiLineStart:  `"""`,
-        MultiLineEnd:    `"""`,
-    },
-    "rust": {
-        Name:            "Rust",
-        Extensions:      []string{".rs"},
-        SingleLineStart: "//",
-        MultiLineStart:  "/*",
-        MultiLineEnd:    "*/",
-    },
-    "shell": {
-        Name:            "Shell Script",
-        Extensions:      []string{".sh", ".bash", ".zsh"},
-        SingleLineStart: "#",
-        MultiLineStart:  "",  // No multi-line comments
-        MultiLineEnd:    "",
-    },
-}
-```
-
-### Step 2: Language Definition Fields
-
-Each language definition requires these fields:
-
-| Field             | Description                  | Example                   | Required |
-| ----------------- | ---------------------------- | ------------------------- | -------- |
-| `Name`            | Human-readable language name | `"Python"`                | ✅       |
-| `Extensions`      | File extensions (with dots)  | `[]string{".py", ".pyw"}` | ✅       |
-| `SingleLineStart` | Single-line comment prefix   | `"#"`                     | ✅       |
-| `MultiLineStart`  | Multi-line comment start     | `"""`                     | ❌       |
-| `MultiLineEnd`    | Multi-line comment end       | `"""`                     | ❌       |
-
-**Note**: If a language doesn't support multi-line comments, leave `MultiLineStart` and `MultiLineEnd` as empty strings (`""`).
-
-### Step 3: Test Your Addition
-
-1. **Create test files** with your new language extension:
-
-   ```bash
-   echo "# This is a comment" > test.py
-   echo "print('Hello, World!')" >> test.py
-   ```
-
-2. **Test comment detection**:
-
-   ```bash
-   go run . test.py
-   ```
-
-3. **Verify the output** shows detected comments
-
-4. **Run the test suite**:
-   ```bash
-   go test -v ./...
-   ```
-
-### Step 4: Add to Documentation
-
-Update the **Supported Languages** table in this README:
-
-```markdown
-| Language | Extensions             | Single-line Comment |
-| -------- | ---------------------- | ------------------- |
-| Python   | `.py`, `.pyw`          | `#`                 |
-| Rust     | `.rs`                  | `//`                |
-| Shell    | `.sh`, `.bash`, `.zsh` | `#`                 |
-```
-
-### Examples of Common Languages
-
-Here are some popular languages you might want to add:
-
-<details>
-<summary>📝 Click to see language definitions</summary>
-
-```go
-// C/C++
-"c": {
-    Name:            "C/C++",
-    Extensions:      []string{".c", ".cpp", ".cc", ".cxx", ".h", ".hpp"},
-    SingleLineStart: "//",
-    MultiLineStart:  "/*",
-    MultiLineEnd:    "*/",
-},
-
-// Python
-"python": {
-    Name:            "Python",
-    Extensions:      []string{".py", ".pyw"},
-    SingleLineStart: "#",
-    MultiLineStart:  `
-```
+MIT License - see [LICENSE](LICENSE) file for details.

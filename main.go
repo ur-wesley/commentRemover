@@ -67,6 +67,7 @@ func main() {
 	var consecutive bool
 	var noWarnLarge bool
 	var excludePatterns string
+	var removeSingleLineMultiline bool
 
 	flag.BoolVar(&write, "write", false, "Write changes to file instead of just logging")
 	flag.BoolVar(&write, "w", false, "Write changes to file (shorthand)")
@@ -84,6 +85,8 @@ func main() {
 	flag.BoolVar(&showHelp, "h", false, "Show help message (shorthand)")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&showVersion, "v", false, "Show version information (shorthand)")
+	flag.BoolVar(&removeSingleLineMultiline, "remove-single-multiline", false, "Remove single-line comments using multi-line patterns (e.g., /* comment */)")
+	flag.BoolVar(&removeSingleLineMultiline, "m", false, "Remove single-line comments using multi-line patterns (shorthand)")
 	flag.Parse()
 
 	var excludeGlobs []string
@@ -95,12 +98,13 @@ func main() {
 	}
 
 	options := ProcessingOptions{
-		Write:           write,
-		NoColor:         noColor,
-		Recursive:       recursive,
-		Consecutive:     consecutive,
-		NoWarnLarge:     noWarnLarge,
-		ExcludePatterns: excludeGlobs,
+		Write:                     write,
+		NoColor:                   noColor,
+		Recursive:                 recursive,
+		Consecutive:               consecutive,
+		NoWarnLarge:               noWarnLarge,
+		ExcludePatterns:           excludeGlobs,
+		RemoveSingleLineMultiline: removeSingleLineMultiline,
 	}
 
 	useColor := !noColor && isTerminal()
