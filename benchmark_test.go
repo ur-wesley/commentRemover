@@ -215,7 +215,7 @@ func BenchmarkDiscoverFilesRecursive(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := DiscoverFiles(tempDir, true)
+		_, err := DiscoverFiles(tempDir, true, []string{})
 		if err != nil {
 			b.Fatalf("DiscoverFiles failed: %v", err)
 		}

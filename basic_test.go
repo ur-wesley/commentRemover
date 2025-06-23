@@ -330,7 +330,7 @@ func TestDiscoverFiles(t *testing.T) {
 		}
 	}
 
-	files, err := DiscoverFiles(tempDir, false)
+	files, err := DiscoverFiles(tempDir, false, []string{})
 	if err != nil {
 		t.Fatalf("DiscoverFiles failed: %v", err)
 	}
