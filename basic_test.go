@@ -354,7 +354,7 @@ func main() {
 		MultiLineEnd:    "*/",
 	}
 
-	result, err := ProcessFile(tmpFile.Name(), lang, false, false)
+	result, err := ProcessFile(tmpFile.Name(), lang, false, false, []string{})
 	if err != nil {
 		t.Fatalf("ProcessFile failed: %v", err)
 	}
@@ -495,7 +495,7 @@ func main() {
 		MultiLineEnd:    "*/",
 	}
 
-	result, err := ProcessFile(tmpFile.Name(), lang, false, true)
+	result, err := ProcessFile(tmpFile.Name(), lang, false, true, []string{})
 	if err != nil {
 		t.Fatalf("ProcessFile failed: %v", err)
 	}
@@ -553,7 +553,7 @@ class Example {
 		MultiLineEnd:    "*/",
 	}
 
-	result, err := ProcessFile(tmpFile.Name(), lang, false, false)
+	result, err := ProcessFile(tmpFile.Name(), lang, false, false, []string{})
 	if err != nil {
 		t.Fatalf("ProcessFile failed: %v", err)
 	}
@@ -615,7 +615,7 @@ namespace Example
 		MultiLineEnd:    "*/",
 	}
 
-	result, err := ProcessFile(tmpFile.Name(), lang, false, true)
+	result, err := ProcessFile(tmpFile.Name(), lang, false, true, []string{})
 	if err != nil {
 		t.Fatalf("ProcessFile failed: %v", err)
 	}
@@ -630,5 +630,148 @@ namespace Example
 	}
 	if strings.Contains(modifiedContent, "/* Single-line multi-line comment */") {
 		t.Error("Single-line multi-line comment should be removed when flag is true")
+	}
+}
+
+func TestIgnorePatterns(t *testing.T) {
+	content := `// This is a regular comment
+// @ts-ignore This should be preserved
+// @deprecated This should be preserved
+// TODO: This should be preserved
+// FIXME: This should be preserved
+
+function test() {
+    // Regular inline comment
+    const x = 42; // @ts-ignore inline ignore comment
+    const y = 10; // Regular inline comment
+    
+    /* Regular multi-line comment */
+    
+    /* @ts-ignore multi-line ignore comment */
+    
+    return x + y;
+}
+
+// @ts-expect-error This should be preserved too`
+
+	tmpFile, err := os.CreateTemp("", "test_*.ts")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	lang := Language{
+		Name:            "TypeScript/JavaScript",
+		Extensions:      []string{".ts", ".tsx", ".js", ".jsx"},
+		SingleLineStart: "//",
+		MultiLineStart:  "/*",
+		MultiLineEnd:    "*/",
+	}
+
+	ignorePatterns := []string{"@ts-ignore", "@deprecated", "TODO", "FIXME", "@ts-expect-error"}
+
+	result, err := ProcessFile(tmpFile.Name(), lang, false, true, ignorePatterns)
+	if err != nil {
+		t.Fatalf("ProcessFile failed: %v", err)
+	}
+
+	// Should only remove 1 comment: regular inline comment
+	if result.CommentsRemoved != 1 {
+		t.Errorf("Expected 1 comment removed, got %d", result.CommentsRemoved)
+	}
+
+	modifiedContent := strings.Join(result.ModifiedLines, "\n")
+
+	// Check that ignore pattern comments are preserved
+	preservedComments := []string{
+		"@ts-ignore This should be preserved",
+		"@deprecated This should be preserved",
+		"TODO: This should be preserved",
+		"FIXME: This should be preserved",
+		"@ts-ignore inline ignore comment",
+		"@ts-ignore multi-line ignore comment",
+		"@ts-expect-error This should be preserved too",
+	}
+
+	for _, comment := range preservedComments {
+		if !strings.Contains(modifiedContent, comment) {
+			t.Errorf("Expected preserved comment containing: %s", comment)
+		}
+	}
+
+	// Check that regular comments are removed
+	removedComments := []string{
+		"Regular inline comment",
+	}
+
+	for _, comment := range removedComments {
+		if strings.Contains(modifiedContent, comment) {
+			t.Errorf("Expected removed comment: %s", comment)
+		}
+	}
+}
+
+func TestShouldIgnoreComment(t *testing.T) {
+	ignorePatterns := []string{"@ts-ignore", "TODO", "FIXME"}
+
+	tests := []struct {
+		name     string
+		comment  string
+		expected bool
+	}{
+		{
+			name:     "standalone ignore comment",
+			comment:  "// @ts-ignore This should be ignored",
+			expected: true,
+		},
+		{
+			name:     "inline ignore comment",
+			comment:  "const x = 42; // @ts-ignore inline comment",
+			expected: true,
+		},
+		{
+			name:     "multi-line ignore comment",
+			comment:  "/* @ts-ignore multi-line comment */",
+			expected: true,
+		},
+		{
+			name:     "TODO comment",
+			comment:  "// TODO: Fix this later",
+			expected: true,
+		},
+		{
+			name:     "FIXME comment",
+			comment:  "// FIXME: This needs attention",
+			expected: true,
+		},
+		{
+			name:     "regular comment",
+			comment:  "// This is a regular comment",
+			expected: false,
+		},
+		{
+			name:     "SQL comment with ignore pattern",
+			comment:  "-- @ts-ignore SQL comment",
+			expected: true,
+		},
+		{
+			name:     "SQL comment without ignore pattern",
+			comment:  "-- Regular SQL comment",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shouldIgnoreComment(tt.comment, ignorePatterns)
+			if result != tt.expected {
+				t.Errorf("Expected %v, got %v for comment: %s", tt.expected, result, tt.comment)
+			}
+		})
 	}
 }

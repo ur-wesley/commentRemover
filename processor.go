@@ -20,7 +20,7 @@ type RemovedComment struct {
 	Content    string
 }
 
-func ProcessFile(filePath string, lang Language, consecutive bool, removeSingleLineMultiline bool) (*CommentRemovalResult, error) {
+func ProcessFile(filePath string, lang Language, consecutive bool, removeSingleLineMultiline bool, ignorePatterns []string) (*CommentRemovalResult, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -62,11 +62,23 @@ func ProcessFile(filePath string, lang Language, consecutive bool, removeSingleL
 
 		processedLine, removed := RemoveSingleLineComment(line, lang, inMultiLineComment, consecutive, isConsecutive)
 
+		if removed && len(ignorePatterns) > 0 && (strings.HasPrefix(strings.TrimSpace(originalLine), lang.SingleLineStart) || strings.Contains(originalLine, lang.SingleLineStart)) {
+			if shouldIgnoreComment(originalLine, ignorePatterns) {
+				removed = false
+				processedLine = originalLine
+			}
+		}
+
 		if !removed && removeSingleLineMultiline && lang.MultiLineStart != "" && lang.MultiLineEnd != "" {
 			if singleLine, content := RemoveSingleLineMultilineComment(line, lang); singleLine {
-				removed = true
-				processedLine = "REMOVE_LINE"
-				originalLine = content
+				if len(ignorePatterns) > 0 && shouldIgnoreComment(content, ignorePatterns) {
+					removed = false
+					processedLine = content
+				} else {
+					removed = true
+					processedLine = "REMOVE_LINE"
+					originalLine = content
+				}
 			}
 		}
 
@@ -261,4 +273,30 @@ func RemoveSingleLineMultilineComment(line string, lang Language) (bool, string)
 		}
 	}
 	return false, ""
+}
+
+func shouldIgnoreComment(commentLine string, ignorePatterns []string) bool {
+	commentContent := strings.TrimSpace(commentLine)
+
+	if strings.Contains(commentContent, "//") {
+		lastCommentIndex := strings.LastIndex(commentContent, "//")
+		if lastCommentIndex != -1 {
+			commentContent = strings.TrimSpace(commentContent[lastCommentIndex+2:])
+		}
+	} else if strings.Contains(commentContent, "--") {
+		lastCommentIndex := strings.LastIndex(commentContent, "--")
+		if lastCommentIndex != -1 {
+			commentContent = strings.TrimSpace(commentContent[lastCommentIndex+2:])
+		}
+	} else if strings.HasPrefix(commentContent, "/*") && strings.HasSuffix(commentContent, "*/") {
+		commentContent = strings.TrimSpace(commentContent[2 : len(commentContent)-2])
+	}
+
+	for _, pattern := range ignorePatterns {
+		if strings.Contains(commentContent, pattern) {
+			return true
+		}
+	}
+
+	return false
 }

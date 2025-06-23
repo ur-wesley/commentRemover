@@ -67,6 +67,7 @@ func main() {
 	var consecutive bool
 	var noWarnLarge bool
 	var excludePatterns string
+	var ignorePatterns string
 	var removeSingleLineMultiline bool
 
 	flag.BoolVar(&write, "write", false, "Write changes to file instead of just logging")
@@ -81,6 +82,8 @@ func main() {
 	flag.BoolVar(&noWarnLarge, "nwl", false, "Disable warnings for large files (shorthand)")
 	flag.StringVar(&excludePatterns, "exclude", "", "Comma-separated glob patterns to exclude (e.g., '*test.go,*.min.js')")
 	flag.StringVar(&excludePatterns, "e", "", "Exclude patterns (shorthand)")
+	flag.StringVar(&ignorePatterns, "ignore-pattern", "", "Comma-separated patterns to ignore in comments (e.g., '@ts-ignore,@deprecated')")
+	flag.StringVar(&ignorePatterns, "i", "", "Ignore patterns in comments (shorthand)")
 	flag.BoolVar(&showHelp, "help", false, "Show help message")
 	flag.BoolVar(&showHelp, "h", false, "Show help message (shorthand)")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
@@ -97,6 +100,14 @@ func main() {
 		}
 	}
 
+	var ignoreGlobs []string
+	if ignorePatterns != "" {
+		ignoreGlobs = strings.Split(ignorePatterns, ",")
+		for i, pattern := range ignoreGlobs {
+			ignoreGlobs[i] = strings.TrimSpace(pattern)
+		}
+	}
+
 	options := ProcessingOptions{
 		Write:                     write,
 		NoColor:                   noColor,
@@ -105,6 +116,7 @@ func main() {
 		NoWarnLarge:               noWarnLarge,
 		ExcludePatterns:           excludeGlobs,
 		RemoveSingleLineMultiline: removeSingleLineMultiline,
+		IgnorePatterns:            ignoreGlobs,
 	}
 
 	useColor := !noColor && isTerminal()

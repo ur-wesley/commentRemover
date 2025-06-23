@@ -19,6 +19,7 @@ type ProcessingOptions struct {
 	Extensions                []string
 	ExcludePatterns           []string
 	RemoveSingleLineMultiline bool
+	IgnorePatterns            []string
 }
 
 type ProcessingStats struct {
@@ -230,7 +231,7 @@ func ProcessMultipleFiles(files []FileInfo, options ProcessingOptions, totalDura
 	useColor := !options.NoColor
 
 	for _, file := range files {
-		result, err := ProcessFile(file.Path, file.Language, options.Consecutive, options.RemoveSingleLineMultiline)
+		result, err := ProcessFile(file.Path, file.Language, options.Consecutive, options.RemoveSingleLineMultiline, options.IgnorePatterns)
 		if err != nil {
 			stats.FailedWrites++
 			stats.Errors = append(stats.Errors, fmt.Sprintf("%s: %v", file.Path, err))

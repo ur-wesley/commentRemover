@@ -82,6 +82,10 @@ commenter -m <file/path>              # Short flag
 commenter -e "*test.go,*.min.js" src/  # Exclude test and minified files
 commenter --exclude "*.spec.js" .      # Exclude spec files
 
+# Ignore comments with specific patterns
+commenter -i "@ts-ignore,@deprecated" src/  # Ignore comments containing these patterns
+commenter --ignore-pattern "TODO,FIXME" .   # Ignore TODO and FIXME comments
+
 # Disable colored output
 commenter --no-color <file/path>
 commenter -nc <file/path>             # Short flag
@@ -114,9 +118,14 @@ bun run commenter -nc build/output.sql
 commenter -e "*test.go,*.min.js" src/
 commenter -w -e "*.spec.js" project/
 
+# Ignore specific comment patterns
+commenter -i "@ts-ignore,@deprecated" src/
+commenter -w -i "TODO,FIXME" project/
+
 # Combine flags for efficiency
 commenter -w -nc large-file.sql           # Write with no colors
 commenter -m src/file.js                  # Remove single-line multi-line comments
+commenter -i "@ts-ignore" src/file.ts     # Ignore TypeScript ignore comments
 ```
 
 ## What gets removed
