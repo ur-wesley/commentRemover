@@ -56,6 +56,58 @@ func getVersionFromPackageJSON() string {
 	return version
 }
 
+
+type Config struct {
+	Write                     *bool    `json:"write"`
+	NoColor                   *bool    `json:"noColor"`
+	Recursive                 *bool    `json:"recursive"`
+	Consecutive               *bool    `json:"consecutive"`
+	NoWarnLarge               *bool    `json:"noWarnLarge"`
+	ExcludePatterns           []string `json:"excludePatterns"`
+	RemoveSingleLineMultiline *bool    `json:"removeSingleLineMultiline"`
+	IgnorePatterns            []string `json:"ignorePatterns"`
+}
+
+func loadConfig(configPath string) (*Config, error) {
+	file, err := os.Open(configPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	var cfg Config
+	dec := json.NewDecoder(file)
+	if err := dec.Decode(&cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func mergeConfigWithFlags(cfg *Config, write, noColor, recursive, consecutive, noWarnLarge, removeSingleLineMultiline bool, excludeGlobs, ignoreGlobs []string) ProcessingOptions {
+	opt := ProcessingOptions{
+		Write:                     write,
+		NoColor:                   noColor,
+		Recursive:                 recursive,
+		Consecutive:               consecutive,
+		NoWarnLarge:               noWarnLarge,
+		ExcludePatterns:           excludeGlobs,
+		RemoveSingleLineMultiline: removeSingleLineMultiline,
+		IgnorePatterns:            ignoreGlobs,
+	}
+
+	if cfg == nil {
+		return opt
+	}
+
+
+	if len(cfg.ExcludePatterns) > 0 && len(excludeGlobs) == 0 {
+		opt.ExcludePatterns = cfg.ExcludePatterns
+	}
+	if len(cfg.IgnorePatterns) > 0 && len(ignoreGlobs) == 0 {
+		opt.IgnorePatterns = cfg.IgnorePatterns
+	}
+	return opt
+}
+
 func main() {
 	startTime := time.Now()
 
@@ -69,6 +121,7 @@ func main() {
 	var excludePatterns string
 	var ignorePatterns string
 	var removeSingleLineMultiline bool
+	var configPath string
 
 	flag.BoolVar(&write, "write", false, "Write changes to file instead of just logging")
 	flag.BoolVar(&write, "w", false, "Write changes to file (shorthand)")
@@ -84,6 +137,7 @@ func main() {
 	flag.StringVar(&excludePatterns, "e", "", "Exclude patterns (shorthand)")
 	flag.StringVar(&ignorePatterns, "ignore-pattern", "", "Comma-separated patterns to ignore in comments (e.g., '@ts-ignore,@deprecated')")
 	flag.StringVar(&ignorePatterns, "i", "", "Ignore patterns in comments (shorthand)")
+	flag.StringVar(&configPath, "config", "", "Path to config file (default: commenter.config.json)")
 	flag.BoolVar(&showHelp, "help", false, "Show help message")
 	flag.BoolVar(&showHelp, "h", false, "Show help message (shorthand)")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
@@ -108,18 +162,17 @@ func main() {
 		}
 	}
 
-	options := ProcessingOptions{
-		Write:                     write,
-		NoColor:                   noColor,
-		Recursive:                 recursive,
-		Consecutive:               consecutive,
-		NoWarnLarge:               noWarnLarge,
-		ExcludePatterns:           excludeGlobs,
-		RemoveSingleLineMultiline: removeSingleLineMultiline,
-		IgnorePatterns:            ignoreGlobs,
+	if configPath == "" {
+		configPath = "commenter.config.json"
+	}
+	var cfg *Config
+	if _, err := os.Stat(configPath); err == nil {
+		cfg, _ = loadConfig(configPath)
 	}
 
-	useColor := !noColor && isTerminal()
+	options := mergeConfigWithFlags(cfg, write, noColor, recursive, consecutive, noWarnLarge, removeSingleLineMultiline, excludeGlobs, ignoreGlobs)
+
+	useColor := !options.NoColor && isTerminal()
 
 	if showVersion {
 		fmt.Printf("%s version %s\n", filepath.Base(os.Args[0]), getVersionFromPackageJSON())
@@ -140,7 +193,7 @@ func main() {
 		inputPath = flag.Arg(0)
 	}
 
-	files, err := DiscoverFiles(inputPath, recursive, options.ExcludePatterns)
+	files, err := DiscoverFiles(inputPath, options.Recursive, options.ExcludePatterns)
 	if err != nil {
 		printError(useColor, "%v", err)
 		os.Exit(1)
@@ -156,7 +209,7 @@ func main() {
 	stats := ProcessMultipleFiles(files, options, duration)
 
 	if len(files) == 1 {
-		if write {
+		if options.Write {
 			printSuccess(useColor, "File updated successfully!")
 		} else {
 			fmt.Printf("\n%sRun with --write to apply changes to the file.%s\n",
@@ -165,7 +218,7 @@ func main() {
 		}
 	} else {
 		printBatchStats(stats, options)
-		if !write {
+		if !options.Write {
 			fmt.Printf("\n%sRun with --write to apply changes to all files.%s\n",
 				colorize(useColor, ColorCyan),
 				colorize(useColor, ColorReset))

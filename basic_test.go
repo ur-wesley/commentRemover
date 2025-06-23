@@ -680,9 +680,9 @@ function test() {
 		t.Fatalf("ProcessFile failed: %v", err)
 	}
 
-	// Should only remove 1 comment: regular inline comment
-	if result.CommentsRemoved != 1 {
-		t.Errorf("Expected 1 comment removed, got %d", result.CommentsRemoved)
+	// Should only remove 3 comments: regular standalone comment, regular inline comment, and regular multi-line comment
+	if result.CommentsRemoved != 3 {
+		t.Errorf("Expected 3 comments removed, got %d", result.CommentsRemoved)
 	}
 
 	modifiedContent := strings.Join(result.ModifiedLines, "\n")
@@ -774,4 +774,251 @@ func TestShouldIgnoreComment(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConfigFileLoading(t *testing.T) {
+	tests := []struct {
+		name        string
+		configJSON  string
+		expectError bool
+		expected    *Config
+	}{
+		{
+			name: "valid config with all fields",
+			configJSON: `{
+				"write": true,
+				"noColor": false,
+				"recursive": true,
+				"consecutive": false,
+				"noWarnLarge": true,
+				"excludePatterns": ["*.test.js", "*.min.js"],
+				"removeSingleLineMultiline": true,
+				"ignorePatterns": ["@ts-ignore", "@deprecated"]
+			}`,
+			expectError: false,
+			expected: &Config{
+				Write:                     boolPtr(true),
+				NoColor:                   boolPtr(false),
+				Recursive:                 boolPtr(true),
+				Consecutive:               boolPtr(false),
+				NoWarnLarge:               boolPtr(true),
+				ExcludePatterns:           []string{"*.test.js", "*.min.js"},
+				RemoveSingleLineMultiline: boolPtr(true),
+				IgnorePatterns:            []string{"@ts-ignore", "@deprecated"},
+			},
+		},
+		{
+			name: "valid config with partial fields",
+			configJSON: `{
+				"write": true,
+				"excludePatterns": ["*.test.js"]
+			}`,
+			expectError: false,
+			expected: &Config{
+				Write:           boolPtr(true),
+				ExcludePatterns: []string{"*.test.js"},
+			},
+		},
+		{
+			name:        "empty config",
+			configJSON:  `{}`,
+			expectError: false,
+			expected:    &Config{},
+		},
+		{
+			name:        "invalid JSON",
+			configJSON:  `{invalid json}`,
+			expectError: true,
+			expected:    nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpFile, err := os.CreateTemp("", "test-config-*.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.Remove(tmpFile.Name())
+
+			if _, err := tmpFile.WriteString(tt.configJSON); err != nil {
+				t.Fatal(err)
+			}
+			tmpFile.Close()
+
+			cfg, err := loadConfig(tmpFile.Name())
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if !reflect.DeepEqual(cfg, tt.expected) {
+				t.Errorf("Expected config %+v, got %+v", tt.expected, cfg)
+			}
+		})
+	}
+}
+
+func TestMergeConfigWithFlags(t *testing.T) {
+	tests := []struct {
+		name                      string
+		config                    *Config
+		write, noColor, recursive bool
+		consecutive, noWarnLarge  bool
+		removeSingleLineMultiline bool
+		excludeGlobs, ignoreGlobs []string
+		expected                  ProcessingOptions
+	}{
+		{
+			name: "config used when flags not provided",
+			config: &Config{
+				Write:                     boolPtr(true),
+				NoColor:                   boolPtr(true),
+				Recursive:                 boolPtr(false),
+				Consecutive:               boolPtr(true),
+				NoWarnLarge:               boolPtr(true),
+				ExcludePatterns:           []string{"*.test.js"},
+				RemoveSingleLineMultiline: boolPtr(true),
+				IgnorePatterns:            []string{"@ts-ignore"},
+			},
+			write: false, noColor: false, recursive: true, consecutive: false, noWarnLarge: false, removeSingleLineMultiline: false,
+			excludeGlobs: []string{}, ignoreGlobs: []string{},
+			expected: ProcessingOptions{
+				Write:                     false,
+				NoColor:                   false,
+				Recursive:                 true,
+				Consecutive:               false,
+				NoWarnLarge:               false,
+				ExcludePatterns:           []string{"*.test.js"},
+				RemoveSingleLineMultiline: false,
+				IgnorePatterns:            []string{"@ts-ignore"},
+			},
+		},
+		{
+			name: "flags override config when both provided",
+			config: &Config{
+				Write:                     boolPtr(false),
+				NoColor:                   boolPtr(false),
+				Recursive:                 boolPtr(false),
+				Consecutive:               boolPtr(false),
+				NoWarnLarge:               boolPtr(false),
+				ExcludePatterns:           []string{"config-pattern"},
+				RemoveSingleLineMultiline: boolPtr(false),
+				IgnorePatterns:            []string{"config-ignore"},
+			},
+			write: true, noColor: true, recursive: true, consecutive: true, noWarnLarge: true, removeSingleLineMultiline: true,
+			excludeGlobs: []string{"flag-pattern"}, ignoreGlobs: []string{"flag-ignore"},
+			expected: ProcessingOptions{
+				Write:                     true,
+				NoColor:                   true,
+				Recursive:                 true,
+				Consecutive:               true,
+				NoWarnLarge:               true,
+				ExcludePatterns:           []string{"flag-pattern"},
+				RemoveSingleLineMultiline: true,
+				IgnorePatterns:            []string{"flag-ignore"},
+			},
+		},
+		{
+			name:   "nil config returns flag values",
+			config: nil,
+			write:  true, noColor: true, recursive: false, consecutive: true, noWarnLarge: true, removeSingleLineMultiline: true,
+			excludeGlobs: []string{"*.test.js"}, ignoreGlobs: []string{"@ts-ignore"},
+			expected: ProcessingOptions{
+				Write:                     true,
+				NoColor:                   true,
+				Recursive:                 false,
+				Consecutive:               true,
+				NoWarnLarge:               true,
+				ExcludePatterns:           []string{"*.test.js"},
+				RemoveSingleLineMultiline: true,
+				IgnorePatterns:            []string{"@ts-ignore"},
+			},
+		},
+		{
+			name: "partial config with nil pointers",
+			config: &Config{
+				Write:           boolPtr(true),
+				ExcludePatterns: []string{"*.test.js"},
+			},
+			write: false, noColor: false, recursive: true, consecutive: false, noWarnLarge: false, removeSingleLineMultiline: false,
+			excludeGlobs: []string{}, ignoreGlobs: []string{},
+			expected: ProcessingOptions{
+				Write:                     false,
+				NoColor:                   false,
+				Recursive:                 true,
+				Consecutive:               false,
+				NoWarnLarge:               false,
+				ExcludePatterns:           []string{"*.test.js"},
+				RemoveSingleLineMultiline: false,
+				IgnorePatterns:            []string{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mergeConfigWithFlags(tt.config, tt.write, tt.noColor, tt.recursive, tt.consecutive, tt.noWarnLarge, tt.removeSingleLineMultiline, tt.excludeGlobs, tt.ignoreGlobs)
+
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("Expected %+v, got %+v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestConfigFileIntegration(t *testing.T) {
+	configJSON := `{
+		"write": true,
+		"noColor": true,
+		"excludePatterns": ["*.test.js", "*.min.js"],
+		"ignorePatterns": ["@ts-ignore", "@deprecated"]
+	}`
+
+	tmpFile, err := os.CreateTemp("", "test-config-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(configJSON); err != nil {
+		t.Fatal(err)
+	}
+	tmpFile.Close()
+
+	cfg, err := loadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	if cfg.Write == nil || !*cfg.Write {
+		t.Error("Expected write to be true")
+	}
+	if cfg.NoColor == nil || !*cfg.NoColor {
+		t.Error("Expected noColor to be true")
+	}
+	if !reflect.DeepEqual(cfg.ExcludePatterns, []string{"*.test.js", "*.min.js"}) {
+		t.Errorf("Expected exclude patterns %v, got %v", []string{"*.test.js", "*.min.js"}, cfg.ExcludePatterns)
+	}
+	if !reflect.DeepEqual(cfg.IgnorePatterns, []string{"@ts-ignore", "@deprecated"}) {
+		t.Errorf("Expected ignore patterns %v, got %v", []string{"@ts-ignore", "@deprecated"}, cfg.IgnorePatterns)
+	}
+}
+
+func TestConfigFileNotFound(t *testing.T) {
+	_, err := loadConfig("nonexistent-config.json")
+	if err == nil {
+		t.Error("Expected error when config file doesn't exist")
+	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
