@@ -27,16 +27,11 @@ func ProcessFile(filePath string, lang Language, consecutive bool, removeSingleL
 	}
 	defer file.Close()
 
-	var lines []string
-	var removedComments []RemovedComment
 	scanner := bufio.NewScanner(file)
 
 	const maxCapacity = 10 * 1024 * 1024
 	buf := make([]byte, maxCapacity)
 	scanner.Buffer(buf, maxCapacity)
-
-	lineNumber := 0
-	inMultiLineComment := false
 
 	var allLines []string
 	for scanner.Scan() {
@@ -49,6 +44,39 @@ func ProcessFile(filePath string, lang Language, consecutive bool, removeSingleL
 		}
 		return nil, err
 	}
+
+	// Check if Tree-sitter is disabled via environment variable
+	if os.Getenv("COMMENTER_DISABLE_TREESITTER") == "1" {
+		return processFileWithRegex(allLines, lang, consecutive, removeSingleLineMultiline, ignorePatterns)
+	}
+
+	content := strings.Join(allLines, "\n")
+
+	// Try Tree-sitter first for supported languages
+	treeSitterProcessor := NewTreeSitterProcessor()
+	modifiedLines, commentsRemoved, err := treeSitterProcessor.ProcessFileWithTreeSitter(content, &lang, ignorePatterns)
+
+	if err == nil {
+		// Tree-sitter processing succeeded
+		return &CommentRemovalResult{
+			OriginalLines:   len(allLines),
+			CommentsRemoved: commentsRemoved,
+			RemainingLines:  len(modifiedLines),
+			ModifiedLines:   modifiedLines,
+			RemovedComments: []RemovedComment{}, // Tree-sitter doesn't track individual comments yet
+		}, nil
+	}
+
+	// Fallback to regex-based processing
+	return processFileWithRegex(allLines, lang, consecutive, removeSingleLineMultiline, ignorePatterns)
+}
+
+// processFileWithRegex contains the original regex-based processing logic
+func processFileWithRegex(allLines []string, lang Language, consecutive bool, removeSingleLineMultiline bool, ignorePatterns []string) (*CommentRemovalResult, error) {
+	var lines []string
+	var removedComments []RemovedComment
+	lineNumber := 0
+	inMultiLineComment := false
 
 	for i, line := range allLines {
 		lineNumber++
@@ -92,10 +120,6 @@ func ProcessFile(filePath string, lang Language, consecutive bool, removeSingleL
 		if processedLine != "REMOVE_LINE" {
 			lines = append(lines, processedLine)
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
 	}
 
 	return &CommentRemovalResult{

@@ -1,0 +1,37 @@
+{
+  "excludePatterns": [
+    "test/",
+    "test-bin/",
+    "test_examples/",
+    "*_test.go",
+    "*.spec.*",
+    "*.example.*",
+    "*.bench*"
+  ],
+  "ignorePatterns": [
+    "@ts-ignore",
+    "@ts-expect-error",
+    "@ts-nocheck",
+    "@deprecated",
+    "@todo",
+    "@fixme",
+    "@hack",
+    "@note",
+    "@warning",
+    "@important",
+    "eslint-disable",
+    "eslint-enable",
+    "prettier-ignore",
+    "stylelint-disable",
+    "stylelint-enable",
+    "TODO:",
+    "FIXME:",
+    "HACK:",
+    "NOTE:",
+    "WARNING:",
+    "IMPORTANT:",
+    "XXX:",
+    "BUG:",
+    "REVIEW:"
+  ]
+}
