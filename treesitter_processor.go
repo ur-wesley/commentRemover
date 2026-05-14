@@ -4,32 +4,53 @@ import (
 	"fmt"
 	"strings"
 
-	sitter "github.com/smacker/go-tree-sitter"
-	"github.com/smacker/go-tree-sitter/golang"
-	"github.com/smacker/go-tree-sitter/javascript"
-	"github.com/smacker/go-tree-sitter/php"
-	"github.com/smacker/go-tree-sitter/sql"
+	ts "github.com/tree-sitter/go-tree-sitter"
+	treeSitterC "github.com/tree-sitter/tree-sitter-c/bindings/go"
+	treeSitterCpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
+	treeSitterGo "github.com/tree-sitter/tree-sitter-go/bindings/go"
+	treeSitterJava "github.com/tree-sitter/tree-sitter-java/bindings/go"
+	treeSitterJs "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
+	treeSitterPhp "github.com/tree-sitter/tree-sitter-php/bindings/go"
+	treeSitterPython "github.com/tree-sitter/tree-sitter-python/bindings/go"
+	treeSitterRuby "github.com/tree-sitter/tree-sitter-ruby/bindings/go"
+	treeSitterRust "github.com/tree-sitter/tree-sitter-rust/bindings/go"
 )
 
 // TreeSitterProcessor handles comment detection using Tree-sitter
 type TreeSitterProcessor struct {
-	parsers map[string]*sitter.Parser
+	parsers map[string]*ts.Parser
 }
 
 // NewTreeSitterProcessor creates a new Tree-sitter processor
 func NewTreeSitterProcessor() *TreeSitterProcessor {
-	processors := map[string]*sitter.Parser{
-		"Go":                    sitter.NewParser(),
-		"TypeScript/JavaScript": sitter.NewParser(),
-		"PHP":                   sitter.NewParser(),
-		"SQL":                   sitter.NewParser(),
+	processors := map[string]*ts.Parser{
+		"C":                   ts.NewParser(),
+		"C++":                 ts.NewParser(),
+		"Go":                  ts.NewParser(),
+		"Java":                ts.NewParser(),
+		"JavaScript":           ts.NewParser(),
+		"TypeScript/JavaScript": ts.NewParser(), // alias
+		"PHP":                 ts.NewParser(),
+		"Python":              ts.NewParser(),
+		"Ruby":                ts.NewParser(),
+		"Rust":                ts.NewParser(),
+		"TypeScript":          ts.NewParser(),
+		"SQL":                 ts.NewParser(),
 	}
 
-	// Set language parsers
-	processors["Go"].SetLanguage(golang.GetLanguage())
-	processors["TypeScript/JavaScript"].SetLanguage(javascript.GetLanguage())
-	processors["PHP"].SetLanguage(php.GetLanguage())
-	processors["SQL"].SetLanguage(sql.GetLanguage())
+	// Set language parsers - tree-sitter org bindings
+	processors["C"].SetLanguage(ts.NewLanguage(treeSitterC.Language()))
+	processors["C++"].SetLanguage(ts.NewLanguage(treeSitterCpp.Language()))
+	processors["Go"].SetLanguage(ts.NewLanguage(treeSitterGo.Language()))
+	processors["Java"].SetLanguage(ts.NewLanguage(treeSitterJava.Language()))
+	processors["JavaScript"].SetLanguage(ts.NewLanguage(treeSitterJs.Language()))
+	processors["TypeScript/JavaScript"].SetLanguage(ts.NewLanguage(treeSitterJs.Language())) // alias
+	processors["PHP"].SetLanguage(ts.NewLanguage(treeSitterPhp.LanguagePHP()))
+	processors["Python"].SetLanguage(ts.NewLanguage(treeSitterPython.Language()))
+	processors["Ruby"].SetLanguage(ts.NewLanguage(treeSitterRuby.Language()))
+	processors["Rust"].SetLanguage(ts.NewLanguage(treeSitterRust.Language()))
+	processors["TypeScript"].SetLanguage(ts.NewLanguage(treeSitterJs.Language())) // TS uses JS grammar
+	// SQL: no tree-sitter parser available
 
 	return &TreeSitterProcessor{
 		parsers: processors,
@@ -43,28 +64,50 @@ type CommentNode struct {
 	StartColumn int
 	EndColumn   int
 	Content     string
-	Type        string // "single_line", "multi_line", "documentation"
+	Type        string
+}
+
+// findCommentNodes finds all comment nodes in the tree
+func (tp *TreeSitterProcessor) findCommentNodes(node *ts.Node, content []byte) []CommentNode {
+	var comments []CommentNode
+
+	// Check for comment types - tree-sitter uses "comment" kind
+	if node.Kind() == "comment" {
+		comments = append(comments, CommentNode{
+			StartLine:   int(node.StartPosition().Row + 1),
+			EndLine:     int(node.EndPosition().Row + 1),
+			StartColumn: int(node.StartPosition().Column),
+			EndColumn:   int(node.EndPosition().Column),
+			Content:     string(content[node.StartByte():node.EndByte()]),
+			Type:        node.Kind(),
+		})
+	}
+
+	for i := uint(0); i < node.ChildCount(); i++ {
+		child := node.Child(i)
+		comments = append(comments, tp.findCommentNodes(child, content)...)
+	}
+
+	return comments
 }
 
 // ProcessFileWithTreeSitter processes a file using Tree-sitter for accurate comment detection
 func (tp *TreeSitterProcessor) ProcessFileWithTreeSitter(content string, lang *Language, ignorePatterns []string) ([]string, int, error) {
-	parser, exists := tp.parsers[lang.Name]
-	if !exists {
-		// Return error to trigger fallback to regex-based processing for unsupported languages
-		return nil, 0, fmt.Errorf("no Tree-sitter parser available for language: %s", lang.Name)
+	parser, ok := tp.parsers[lang.Name]
+	if !ok {
+		return nil, 0, fmt.Errorf("unsupported language: %s", lang.Name)
 	}
 
-	// Parse the content
-	tree := parser.Parse(nil, []byte(content))
+	contentBytes := []byte(content)
+	tree := parser.Parse(contentBytes, nil)
+	if tree == nil {
+		return nil, 0, fmt.Errorf("failed to parse content")
+	}
 	defer tree.Close()
 
-	// Get the root node
 	rootNode := tree.RootNode()
+	comments := tp.findCommentNodes(rootNode, contentBytes)
 
-	// Find all comment nodes
-	comments := tp.findCommentNodes(rootNode, content)
-
-	// Process lines with comment information
 	lines := strings.Split(content, "\n")
 	modifiedLines := make([]string, len(lines))
 	copy(modifiedLines, lines)
@@ -72,43 +115,32 @@ func (tp *TreeSitterProcessor) ProcessFileWithTreeSitter(content string, lang *L
 	commentsRemoved := 0
 
 	for _, comment := range comments {
-		// Check if comment should be ignored
 		if tp.shouldIgnoreComment(comment.Content, ignorePatterns) {
 			continue
 		}
 
-		// Remove the comment
 		if comment.StartLine == comment.EndLine {
-			// Single line comment
 			line := lines[comment.StartLine-1]
 			if comment.StartColumn == 0 {
-				// Full line comment
 				modifiedLines[comment.StartLine-1] = "REMOVE_LINE"
 			} else {
-				// Inline comment - preserve indentation
 				modifiedLines[comment.StartLine-1] = strings.TrimRight(line[:comment.StartColumn], " \t")
 			}
 		} else {
-			// Multi-line comment
 			for i := comment.StartLine - 1; i < comment.EndLine; i++ {
 				if i == comment.StartLine-1 {
-					// First line of multi-line comment
 					if comment.StartColumn == 0 {
 						modifiedLines[i] = "REMOVE_LINE"
 					} else {
-						// Preserve indentation
 						modifiedLines[i] = strings.TrimRight(lines[i][:comment.StartColumn], " \t")
 					}
 				} else if i == comment.EndLine-1 {
-					// Last line of multi-line comment
 					if comment.EndColumn >= len(lines[i]) {
 						modifiedLines[i] = "REMOVE_LINE"
 					} else {
-						// Preserve indentation
 						modifiedLines[i] = strings.TrimRight(lines[i][comment.EndColumn:], " \t")
 					}
 				} else {
-					// Middle lines of multi-line comment
 					modifiedLines[i] = "REMOVE_LINE"
 				}
 			}
@@ -116,7 +148,6 @@ func (tp *TreeSitterProcessor) ProcessFileWithTreeSitter(content string, lang *L
 		commentsRemoved++
 	}
 
-	// Clean up REMOVE_LINE markers
 	finalLines := make([]string, 0, len(modifiedLines))
 	for _, line := range modifiedLines {
 		if line != "REMOVE_LINE" {
@@ -127,97 +158,6 @@ func (tp *TreeSitterProcessor) ProcessFileWithTreeSitter(content string, lang *L
 	return finalLines, commentsRemoved, nil
 }
 
-// findCommentNodes recursively finds all comment nodes in the syntax tree
-func (tp *TreeSitterProcessor) findCommentNodes(node *sitter.Node, content string) []CommentNode {
-	var comments []CommentNode
-	processedNodes := make(map[*sitter.Node]bool)
-
-	var findComments func(*sitter.Node)
-	findComments = func(n *sitter.Node) {
-		// Check if current node is a comment and hasn't been processed
-		if tp.isCommentNode(n) && !processedNodes[n] {
-			comment := tp.nodeToComment(n, content)
-			comments = append(comments, comment)
-			processedNodes[n] = true
-		}
-
-		// Recursively check children
-		for i := 0; i < int(n.ChildCount()); i++ {
-			child := n.Child(i)
-			findComments(child)
-		}
-	}
-
-	findComments(node)
-	return comments
-}
-
-// isCommentNode checks if a node represents a comment
-func (tp *TreeSitterProcessor) isCommentNode(node *sitter.Node) bool {
-	nodeType := node.Type()
-	return strings.Contains(nodeType, "comment") ||
-		nodeType == "comment" ||
-		nodeType == "line_comment" ||
-		nodeType == "block_comment" ||
-		nodeType == "documentation_comment" ||
-		nodeType == "comment_block" ||
-		nodeType == "line_comment_block"
-}
-
-// nodeToComment converts a Tree-sitter node to a CommentNode
-func (tp *TreeSitterProcessor) nodeToComment(node *sitter.Node, content string) CommentNode {
-	startPoint := node.StartPoint()
-	endPoint := node.EndPoint()
-
-	// Convert Tree-sitter points to line/column numbers
-	startLine := int(startPoint.Row) + 1
-	endLine := int(endPoint.Row) + 1
-	startColumn := int(startPoint.Column)
-	endColumn := int(endPoint.Column)
-
-	// Extract comment content
-	lines := strings.Split(content, "\n")
-	var commentContent string
-
-	if startLine == endLine {
-		// Single line comment
-		line := lines[startLine-1]
-		commentContent = line[startColumn:endColumn]
-	} else {
-		// Multi-line comment
-		var parts []string
-		for i := startLine - 1; i < endLine; i++ {
-			if i == startLine-1 {
-				parts = append(parts, lines[i][startColumn:])
-			} else if i == endLine-1 {
-				parts = append(parts, lines[i][:endColumn])
-			} else {
-				parts = append(parts, lines[i])
-			}
-		}
-		commentContent = strings.Join(parts, "\n")
-	}
-
-	// Determine comment type
-	commentType := "multi_line"
-	if startLine == endLine {
-		commentType = "single_line"
-	}
-	if strings.Contains(node.Type(), "documentation") {
-		commentType = "documentation"
-	}
-
-	return CommentNode{
-		StartLine:   startLine,
-		EndLine:     endLine,
-		StartColumn: startColumn,
-		EndColumn:   endColumn,
-		Content:     commentContent,
-		Type:        commentType,
-	}
-}
-
-// shouldIgnoreComment checks if a comment should be ignored based on patterns
 func (tp *TreeSitterProcessor) shouldIgnoreComment(commentContent string, ignorePatterns []string) bool {
 	for _, pattern := range ignorePatterns {
 		if strings.Contains(commentContent, pattern) {
@@ -227,15 +167,11 @@ func (tp *TreeSitterProcessor) shouldIgnoreComment(commentContent string, ignore
 	return false
 }
 
-// ProcessFileWithRegex is a fallback function for unsupported languages
 func ProcessFileWithRegex(content string, lang *Language, ignorePatterns []string) ([]string, int, error) {
 	lines := strings.Split(content, "\n")
-
-	// Use the existing regex-based processing
 	result, err := processFileWithRegex(lines, *lang, false, false, ignorePatterns)
 	if err != nil {
 		return nil, 0, err
 	}
-
 	return result.ModifiedLines, result.CommentsRemoved, nil
 }
